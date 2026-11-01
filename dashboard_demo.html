@@ -43,14 +43,12 @@
     overflow: hidden;
   }
 
-  /* ── Burp outer chrome ── */
   .burp-chrome {
     display: flex; flex-direction: column;
     height: 100vh; min-height: 600px;
     border: 1px solid #111;
   }
 
-  /* title bar */
   .title-bar {
     background: #161616;
     padding: 5px 10px;
@@ -62,7 +60,6 @@
   .title-bar .dot { width:10px;height:10px;border-radius:50%;background:#555; }
   .title-bar .logo { color: var(--accent); font-weight: 700; font-size: 12px; margin-right:6px; }
 
-  /* top tabs (Burp main tabs) */
   .burp-tabs {
     background: #1a1a1a;
     display: flex; align-items: flex-end;
@@ -93,10 +90,8 @@
   .burp-tab.ext-tab { color: var(--accent); }
   .burp-tab.ext-tab.active { background: #2a1e0e; border-color: var(--accent-dim); }
 
-  /* main body */
   .burp-body { display: flex; flex: 1; overflow: hidden; }
 
-  /* ── Extension inner tabs ── */
   .ext-wrap { display: flex; flex-direction: column; width: 100%; overflow: hidden; }
 
   .ext-tabs {
@@ -183,7 +178,6 @@
     font-family: var(--font-mono);
   }
   .s-input:focus { border-color: var(--accent); }
-  .s-input.wide { width: 220px; }
   .s-note { font-size: 10px; color: var(--text-dim); margin-left: 2px; }
 
   .profile-table {
@@ -260,9 +254,6 @@
   }
   .btn.primary:hover { background: var(--accent); color: #fff; }
 
-  .toggle-wrap {
-    display: flex; align-items: center; gap: 8px;
-  }
   .toggle {
     position: relative; width: 34px; height: 18px;
   }
@@ -286,7 +277,6 @@
     flex: 1; display: flex; flex-direction: column; overflow: hidden;
   }
 
-  /* progress */
   .progress-bar-wrap {
     background: #1e1e1e;
     border-bottom: 1px solid var(--border);
@@ -301,26 +291,19 @@
   .progress-label span { color: var(--accent); font-weight: 700; }
   .progress-btns { display: flex; gap: 5px; }
   .progress-track {
-    height: 5px;
-    background: #333;
-    border-radius: 3px;
-    overflow: hidden;
+    height: 5px; background: #333; border-radius: 3px; overflow: hidden;
   }
   .progress-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--accent-dim), var(--accent));
-    border-radius: 3px;
-    width: 62%;
-    transition: width .3s;
+    border-radius: 3px; width: 62%; transition: width .3s;
   }
   .progress-meta {
-    display: flex; gap: 16px;
-    margin-top: 4px;
+    display: flex; gap: 16px; margin-top: 4px;
     font-size: 10px; color: var(--text-dim);
   }
   .progress-meta span b { color: var(--text); }
 
-  /* summary */
   .summary-bar {
     background: var(--panel-alt);
     border-bottom: 1px solid var(--border);
@@ -329,8 +312,7 @@
     flex-shrink: 0;
   }
   .sum-item {
-    display: flex; align-items: center; gap: 5px;
-    font-size: 11px;
+    display: flex; align-items: center; gap: 5px; font-size: 11px;
   }
   .sum-item .label { color: var(--text-dim); }
   .sum-item .val { font-weight: 700; font-family: var(--font-mono); }
@@ -339,10 +321,37 @@
   .sum-item .val.diff { color: var(--diff); }
   .sum-item .val.total { color: var(--text-bright); }
   .sum-sep { width: 1px; height: 14px; background: var(--border); }
+  .export-btn { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 
-  .export-btn {
-    margin-left: auto;
-    display: flex; align-items: center; gap: 4px;
+  /* ── Profile pair selector bar ── */
+  .pair-bar {
+    background: #1c1c1c;
+    border-bottom: 1px solid var(--border);
+    padding: 5px 10px;
+    display: flex; align-items: center; gap: 8px;
+    flex-shrink: 0;
+  }
+  .pair-label {
+    font-size: 11px; color: var(--text-dim);
+    margin-right: 4px; white-space: nowrap;
+  }
+  .pair-btn {
+    padding: 3px 12px;
+    font-size: 11px; font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+    transition: .15s;
+  }
+  .pair-btn:hover { border-color: #555; color: var(--text); background: #2a2a2a; }
+  .pair-btn.active-ab { background: #1a2a3c; color: #7ab8f5; border-color: #3a6a9c; }
+  .pair-btn.active-ac { background: #2a1a2e; color: #f57adb; border-color: #7a3a7c; }
+  .pair-btn.active-bc { background: #1a2e1a; color: #7af5a0; border-color: #3a7c3a; }
+  .pair-note {
+    margin-left: auto; font-size: 10px; color: var(--text-dim); font-style: italic;
   }
 
   /* filter */
@@ -390,8 +399,7 @@
   }
   table.results {
     width: 100%; border-collapse: collapse;
-    font-size: 11px;
-    table-layout: fixed;
+    font-size: 11px; table-layout: fixed;
   }
   table.results th {
     background: #1e1e1e;
@@ -401,17 +409,15 @@
     border-bottom: 1px solid var(--border);
     text-align: left;
     position: sticky; top: 0; z-index: 2;
-    white-space: nowrap;
-    overflow: hidden;
+    white-space: nowrap; overflow: hidden;
   }
   table.results th:first-child { width: 36px; }
-  table.results .col-method { width: 54px; }
-  table.results .col-url    { /* flex */ }
-  table.results .col-grp    { width: 54px; text-align: center; }
-  table.results .col-sta    { width: 54px; text-align: center; }
-  table.results .col-stb    { width: 54px; text-align: center; }
-  table.results .col-verdict{ width: 80px; }
-  table.results .col-sim    { width: 64px; text-align: right; }
+  table.results .col-method  { width: 54px; }
+  table.results .col-grp     { width: 54px; text-align: center; }
+  table.results .col-st1     { width: 54px; text-align: center; }
+  table.results .col-st2     { width: 54px; text-align: center; }
+  table.results .col-verdict { width: 90px; }
+  table.results .col-sim     { width: 100px; text-align: right; }
 
   table.results td {
     padding: 4px 8px;
@@ -420,8 +426,7 @@
     cursor: pointer;
   }
   table.results tr:hover td { background: var(--row-hover); }
-  table.results tr.selected td { background: var(--row-sel) !important; }
-  table.results tr.selected td { color: var(--text-bright); }
+  table.results tr.selected td { background: var(--row-sel) !important; color: var(--text-bright); }
 
   .method-badge {
     display: inline-block; padding: 1px 5px;
@@ -470,8 +475,7 @@
 
   /* bottom detail */
   .detail-wrap {
-    flex-shrink: 0;
-    height: 180px;
+    flex-shrink: 0; height: 180px;
     background: #1e1e1e;
     border-top: 1px solid var(--border);
     display: flex; flex-direction: column; overflow: hidden;
@@ -503,17 +507,15 @@
 
   .diff-line-add { color: #7af5a0; background: rgba(39,174,96,.1); display: block; padding: 0 4px; }
   .diff-line-del { color: #f57a7a; background: rgba(192,57,43,.1); display: block; padding: 0 4px; }
-  .diff-line-ctx { color: #666;    display: block; padding: 0 4px; }
+  .diff-line-ctx { color: #666; display: block; padding: 0 4px; }
 
-  /* group drill down */
   .drilldown {
     position: absolute; z-index: 10;
     background: #222; border: 1px solid var(--border);
     border-radius: 4px; padding: 8px 10px;
     font-size: 10px; font-family: var(--font-mono);
     box-shadow: 0 4px 16px rgba(0,0,0,.5);
-    max-width: 360px;
-    display: none;
+    max-width: 360px; display: none;
   }
   .drilldown.show { display: block; }
   .drilldown .dd-title { color: var(--accent); font-weight: 700; margin-bottom: 5px; }
@@ -521,7 +523,6 @@
   .drilldown .dd-item.rep { color: #7ab8f5; }
   .drilldown .dd-rep { color: var(--text-dim); font-size: 9px; }
 
-  /* scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: #1a1a1a; }
   ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 3px; }
@@ -532,14 +533,12 @@
 
 <div class="burp-chrome">
 
-  <!-- title bar -->
   <div class="title-bar">
     <div class="dot"></div><div class="dot"></div><div class="dot"></div>
     <span class="logo">Burp Suite Professional</span>
     <span>v2024.10.1 · yongdeokasd</span>
   </div>
 
-  <!-- Burp main tabs -->
   <div class="burp-tabs">
     <div class="burp-tab">Dashboard</div>
     <div class="burp-tab">Target</div>
@@ -551,32 +550,29 @@
     <div class="burp-tab">Decoder</div>
   </div>
 
-  <!-- Extension body -->
   <div class="burp-body">
     <div class="ext-wrap">
 
-      <!-- inner tabs -->
       <div class="ext-tabs">
-        <button class="ext-tab-btn" id="btn-settings" onclick="switchTab('settings')">⚙ 설정</button>
-        <button class="ext-tab-btn active" id="btn-results" onclick="switchTab('results')">📊 결과</button>
+        <button class="ext-tab-btn" id="btn-settings" onclick="switchTab('settings')">설정</button>
+        <button class="ext-tab-btn active" id="btn-results" onclick="switchTab('results')">결과</button>
       </div>
 
       <!-- ── SETTINGS TAB ── -->
       <div id="tab-settings" style="display:none;">
         <div class="settings-sidebar">
-          <div class="s-item active" onclick="selectSection(this,'sec-profile')">👤 사용자 프로필</div>
-          <div class="s-item" onclick="selectSection(this,'sec-replay')">🔁 재전송 설정</div>
-          <div class="s-item" onclick="selectSection(this,'sec-dedup')">🗂 중복 제거</div>
+          <div class="s-item active" onclick="selectSection(this,'sec-profile')">사용자 프로필</div>
+          <div class="s-item" onclick="selectSection(this,'sec-replay')">재전송 설정</div>
+          <div class="s-item" onclick="selectSection(this,'sec-dedup')">중복 제거</div>
           <div class="s-sep"></div>
-          <div class="s-item" onclick="selectSection(this,'sec-exclude')">🚫 제외 엔드포인트</div>
-          <div class="s-item" onclick="selectSection(this,'sec-static')">📂 정적 자원 필터</div>
+          <div class="s-item" onclick="selectSection(this,'sec-exclude')">제외 엔드포인트</div>
+          <div class="s-item" onclick="selectSection(this,'sec-static')">정적 자원 필터</div>
           <div class="s-sep"></div>
-          <div class="s-item" onclick="selectSection(this,'sec-compare')">🔬 비교 설정</div>
+          <div class="s-item" onclick="selectSection(this,'sec-compare')">비교 설정</div>
         </div>
 
         <div class="settings-content">
 
-          <!-- Profile -->
           <div id="sec-profile" class="s-section">
             <div class="s-title">사용자 프로필 (User Profiles)</div>
             <table class="profile-table">
@@ -610,7 +606,6 @@
             <button class="btn primary">+ 프로필 추가</button>
           </div>
 
-          <!-- Replay -->
           <div id="sec-replay" class="s-section" style="display:none;">
             <div class="s-title">재전송 설정</div>
             <div class="s-row"><span class="s-label">Thread Pool 크기</span><input class="s-input" value="10"><span class="s-note">threads</span></div>
@@ -619,7 +614,6 @@
             <div class="s-row"><span class="s-label">Timeout</span><input class="s-input" value="10"><span class="s-note">초</span></div>
           </div>
 
-          <!-- Dedup -->
           <div id="sec-dedup" class="s-section" style="display:none;">
             <div class="s-title">중복 제거 설정</div>
             <div class="s-row">
@@ -632,7 +626,6 @@
             </div>
           </div>
 
-          <!-- Exclude -->
           <div id="sec-exclude" class="s-section" style="display:none;">
             <div class="s-title">제외 엔드포인트</div>
             <div class="exclusion-list">
@@ -648,7 +641,6 @@
             </div>
           </div>
 
-          <!-- Static filter -->
           <div id="sec-static" class="s-section" style="display:none;">
             <div class="s-title">정적 자원 필터</div>
             <div class="s-label" style="margin-bottom:6px;width:auto;">제외 확장자</div>
@@ -678,7 +670,6 @@
             </div>
           </div>
 
-          <!-- Compare -->
           <div id="sec-compare" class="s-section" style="display:none;">
             <div class="s-title">비교 설정</div>
             <div class="s-row">
@@ -691,8 +682,8 @@
             </div>
           </div>
 
-        </div><!-- /settings-content -->
-      </div><!-- /tab-settings -->
+        </div>
+      </div>
 
       <!-- ── RESULTS TAB ── -->
       <div id="tab-results" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
@@ -705,8 +696,8 @@
               &nbsp;|&nbsp; User A·B·C 동시 재전송 (총 <span>837</span> HTTP 요청)
             </div>
             <div class="progress-btns">
-              <button class="btn">⏸ 일시정지</button>
-              <button class="btn">✕ 취소</button>
+              <button class="btn">일시정지</button>
+              <button class="btn">취소</button>
             </div>
           </div>
           <div class="progress-track"><div class="progress-fill"></div></div>
@@ -722,27 +713,51 @@
         <div class="summary-bar">
           <div class="sum-item"><span class="label">총 요청</span><span class="val total">450</span></div>
           <div class="sum-sep"></div>
-          <div class="sum-item"><span class="label">SAME</span><span class="val same">14</span></div>
-          <div class="sum-item"><span class="label">SIMILAR</span><span class="val similar">31</span></div>
-          <div class="sum-item"><span class="label">DIFFERENCE</span><span class="val diff">234</span></div>
+          <div class="sum-item"><span class="label">SAME</span><span class="val same" id="cnt-same">14</span></div>
+          <div class="sum-item"><span class="label">SIMILAR</span><span class="val similar" id="cnt-similar">31</span></div>
+          <div class="sum-item"><span class="label">DIFFERENCE</span><span class="val diff" id="cnt-diff">234</span></div>
           <div class="sum-sep"></div>
           <div class="sum-item"><span class="label" style="color:#888">미완료</span><span class="val" style="color:#888">171</span></div>
           <div class="export-btn">
-            <button class="btn primary" onclick="alert('CSV 내보내기 (현재 279개 기준)')">⬇ CSV 내보내기</button>
+            <button class="btn primary" onclick="alert('CSV 내보내기 (현재 279개 기준)')">CSV 내보내기</button>
           </div>
+        </div>
+
+        <!-- profile pair selector -->
+        <div class="pair-bar">
+          <span class="pair-label">비교 프로필:</span>
+          <button class="pair-btn active-ab" id="pair-ab" onclick="setPair('ab')">
+            <span class="badge-user badge-a" style="font-size:9px;padding:1px 4px">A</span>
+            &nbsp;↔&nbsp;
+            <span class="badge-user badge-b" style="font-size:9px;padding:1px 4px">B</span>
+            &nbsp;User A vs User B
+          </button>
+          <button class="pair-btn" id="pair-ac" onclick="setPair('ac')">
+            <span class="badge-user badge-a" style="font-size:9px;padding:1px 4px">A</span>
+            &nbsp;↔&nbsp;
+            <span class="badge-user badge-c" style="font-size:9px;padding:1px 4px">C</span>
+            &nbsp;User A vs Admin
+          </button>
+          <button class="pair-btn" id="pair-bc" onclick="setPair('bc')">
+            <span class="badge-user badge-b" style="font-size:9px;padding:1px 4px">B</span>
+            &nbsp;↔&nbsp;
+            <span class="badge-user badge-c" style="font-size:9px;padding:1px 4px">C</span>
+            &nbsp;User B vs Admin
+          </button>
+          <span class="pair-note" id="pair-note">A 요청을 기준으로 B 응답과 비교</span>
         </div>
 
         <!-- filter -->
         <div class="filter-bar">
-          <button class="filter-btn active" onclick="setFilter(this,'all')">전체 279</button>
-          <button class="filter-btn f-same" onclick="setFilter(this,'same')">🔴 SAME 14</button>
-          <button class="filter-btn f-sim"  onclick="setFilter(this,'similar')">🟠 SIMILAR 31</button>
-          <button class="filter-btn f-diff" onclick="setFilter(this,'diff')">🟢 DIFFERENCE 234</button>
-          <input class="filter-search" placeholder="🔍  URL 검색..." oninput="filterTable(this.value)">
+          <button class="filter-btn active" onclick="setFilter(this,'all')" id="fbtn-all">전체</button>
+          <button class="filter-btn f-same"  onclick="setFilter(this,'same')" id="fbtn-same">SAME</button>
+          <button class="filter-btn f-sim"   onclick="setFilter(this,'similar')" id="fbtn-similar">SIMILAR</button>
+          <button class="filter-btn f-diff"  onclick="setFilter(this,'diff')" id="fbtn-diff">DIFFERENCE</button>
+          <input class="filter-search" placeholder="URL 검색..." oninput="filterTable(this.value)">
         </div>
 
         <!-- table -->
-        <div class="table-wrap" id="tableWrap">
+        <div class="table-wrap">
           <table class="results" id="resultsTable">
             <thead>
               <tr>
@@ -750,8 +765,8 @@
                 <th class="col-method">Method</th>
                 <th>URL</th>
                 <th class="col-grp">그룹</th>
-                <th class="col-sta">A 상태</th>
-                <th class="col-stb">B 상태</th>
+                <th class="col-st1" id="th-st1"><span class="badge-user badge-a" style="font-size:9px;padding:1px 4px">A</span> 상태</th>
+                <th class="col-st2" id="th-st2"><span class="badge-user badge-b" style="font-size:9px;padding:1px 4px">B</span> 상태</th>
                 <th class="col-verdict">판정</th>
                 <th class="col-sim">유사도</th>
               </tr>
@@ -762,12 +777,16 @@
 
         <!-- detail panel -->
         <div class="detail-wrap">
-          <div class="detail-tabs">
-            <div class="d-tab active" onclick="switchDetail(this,'d-a')">User A 요청/응답</div>
-            <div class="d-tab" onclick="switchDetail(this,'d-b')">User B 요청/응답</div>
+          <div class="detail-tabs" id="detail-tabs">
+            <div class="d-tab active" id="dtab-p1" onclick="switchDetail(this,'d-p1')">
+              <span class="badge-user badge-a" style="font-size:9px;padding:1px 4px">A</span> User A
+            </div>
+            <div class="d-tab" id="dtab-p2" onclick="switchDetail(this,'d-p2')">
+              <span class="badge-user badge-b" style="font-size:9px;padding:1px 4px">B</span> User B
+            </div>
             <div class="d-tab" onclick="switchDetail(this,'d-diff')">Diff 뷰</div>
           </div>
-          <div class="detail-body" id="d-a">
+          <div class="detail-body" id="d-p1">
 <span class="kw">GET</span> <span class="str">/api/v2/user/1041/profile</span> HTTP/1.1
 Host: <span class="str">api.example.com</span>
 Cookie: <span class="str">session=aA1bB2cC3dD4eE5fF6; auth_token=eyJhbGciOiJIUzI1NiJ9...</span>
@@ -785,7 +804,7 @@ Content-Type: application/json
   <span class="key">"dept"</span>: <span class="str">"Finance"</span>,
   <span class="key">"employee_id"</span>: <span class="str">"EMP-0041"</span>
 }</div>
-          <div class="detail-body" id="d-b" style="display:none;">
+          <div class="detail-body" id="d-p2" style="display:none;">
 <span class="kw">GET</span> <span class="str">/api/v2/user/1041/profile</span> HTTP/1.1
 Host: <span class="str">api.example.com</span>
 Cookie: <span class="str">session=xX9yY8zZ7wW6vV5uU4; auth_token=eyJhbGciOiJIUzI1NiJ9...</span>
@@ -803,18 +822,29 @@ Content-Type: application/json
   <span class="key">"dept"</span>: <span class="str">"Finance"</span>,
   <span class="key">"employee_id"</span>: <span class="str">"EMP-0041"</span>
 }</div>
-          <div class="detail-body" id="d-diff" style="display:none;"><span class="diff-line-ctx"> {</span><span class="diff-line-ctx">   "id": 1041,</span><span class="diff-line-ctx">   "username": "alice_corp",</span><span class="diff-line-ctx">   "email": "alice@corp.internal",</span><span class="diff-line-ctx">   "role": "user",</span><span class="diff-line-ctx">   "dept": "Finance",</span><span class="diff-line-ctx">   "employee_id": "EMP-0041"</span><span class="diff-line-ctx"> }</span><span style="color:#888;display:block;margin-top:6px;font-size:10px;">⚠ User B가 User A(id:1041)의 데이터를 그대로 수신 — IDOR 의심</span></div>
+          <div class="detail-body" id="d-diff" style="display:none;">
+<span style="color:#555;font-size:10px">── Diff 뷰 (선택된 비교 쌍 기준) ──────────────</span>
+<div id="diff-content">
+<span class="diff-line-ctx"> {</span>
+<span class="diff-line-ctx">   "id": 1041,</span>
+<span class="diff-line-ctx">   "username": "alice_corp",</span>
+<span class="diff-line-ctx">   "email": "alice@corp.internal",</span>
+<span class="diff-line-ctx">   "role": "user",</span>
+<span class="diff-line-ctx">   "dept": "Finance",</span>
+<span class="diff-line-ctx">   "employee_id": "EMP-0041"</span>
+<span class="diff-line-ctx"> }</span>
+<span style="color:#f5c842;display:block;margin-top:6px;font-size:10px" id="diff-note">A-B SAME(100%) — User B가 User A(id:1041)의 데이터를 그대로 수신 → IDOR 의심</span>
+</div>
+</div>
         </div>
 
-      </div><!-- /tab-results -->
+      </div>
+    </div>
+  </div>
+</div>
 
-    </div><!-- /ext-wrap -->
-  </div><!-- /burp-body -->
-</div><!-- /burp-chrome -->
-
-<!-- drill-down tooltip -->
 <div class="drilldown" id="drilldown">
-  <div class="dd-title">📎 그룹핑된 요청 목록</div>
+  <div class="dd-title">그룹핑된 요청 목록</div>
   <div id="dd-content"></div>
 </div>
 
@@ -827,7 +857,6 @@ function switchTab(name) {
   document.getElementById('btn-results').classList.toggle('active',  name==='results');
 }
 
-// ── Settings section switching ──
 function selectSection(el, sectionId) {
   document.querySelectorAll('.settings-sidebar .s-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
@@ -835,52 +864,39 @@ function selectSection(el, sectionId) {
   document.getElementById(sectionId).style.display = 'block';
 }
 
-// ── Detail tabs ──
 function switchDetail(el, panelId) {
   document.querySelectorAll('.d-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
-  ['d-a','d-b','d-diff'].forEach(id => {
+  ['d-p1','d-p2','d-diff'].forEach(id => {
     document.getElementById(id).style.display = id===panelId ? 'block' : 'none';
   });
 }
 
-// ── Filter buttons ──
-function setFilter(el, type) {
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  currentFilter = type;
-  renderTable();
-}
-function filterTable(val) {
-  searchVal = val.toLowerCase();
-  renderTable();
-}
-
 // ── Data ──
+// Each row has simAB, simAC, simBC for all 3 pairs
 const ROWS = [
-  {id:1,  method:'GET',    url:'/api/v2/user/1041/profile',        host:'api.example.com', grp:3,  sa:200, sb:200, verdict:'SAME',       sim:100.0},
-  {id:2,  method:'GET',    url:'/api/v2/invoice/2024-INV-8842',    host:'api.example.com', grp:12, sa:200, sb:200, verdict:'SAME',        sim:100.0},
-  {id:3,  method:'GET',    url:'/api/v1/order/88421/detail',       host:'api.example.com', grp:7,  sa:200, sb:200, verdict:'SAME',        sim:98.2},
-  {id:4,  method:'POST',   url:'/api/v2/messages/send',            host:'api.example.com', grp:1,  sa:201, sb:201, verdict:'SAME',        sim:100.0},
-  {id:5,  method:'GET',    url:'/api/v1/admin/users/list',         host:'api.example.com', grp:1,  sa:200, sb:403, verdict:'DIFFERENCE',  sim:4.1},
-  {id:6,  method:'GET',    url:'/api/v2/report/monthly?dept=fin',  host:'api.example.com', grp:4,  sa:200, sb:200, verdict:'SIMILAR',     sim:87.3},
-  {id:7,  method:'GET',    url:'/api/v2/document/FIN-2024-0123.pdf',host:'api.example.com',grp:1,  sa:200, sb:403, verdict:'DIFFERENCE',  sim:2.7},
-  {id:8,  method:'PUT',    url:'/api/v2/user/1041/settings',       host:'api.example.com', grp:1,  sa:200, sb:200, verdict:'SIMILAR',     sim:91.0},
-  {id:9,  method:'GET',    url:'/api/v1/analytics/dashboard',      host:'api.example.com', grp:2,  sa:200, sb:200, verdict:'SIMILAR',     sim:82.5},
-  {id:10, method:'DELETE', url:'/api/v2/comment/3317',             host:'api.example.com', grp:1,  sa:204, sb:403, verdict:'DIFFERENCE',  sim:0.0},
-  {id:11, method:'GET',    url:'/api/v2/notification/inbox',       host:'api.example.com', grp:1,  sa:200, sb:200, verdict:'SAME',        sim:100.0},
-  {id:12, method:'GET',    url:'/api/v1/file/export?format=csv',   host:'api.example.com', grp:3,  sa:200, sb:403, verdict:'DIFFERENCE',  sim:3.2},
-  {id:13, method:'POST',   url:'/api/v2/payment/checkout',         host:'api.example.com', grp:1,  sa:200, sb:200, verdict:'SIMILAR',     sim:84.1},
-  {id:14, method:'GET',    url:'/api/v2/contract/CTR-2024-991',    host:'api.example.com', grp:5,  sa:200, sb:200, verdict:'SAME',        sim:100.0},
-  {id:15, method:'GET',    url:'/api/v1/config/app-settings',      host:'api.example.com', grp:1,  sa:200, sb:200, verdict:'DIFFERENCE',  sim:22.8},
+  {id:1,  method:'GET',    url:'/api/v2/user/1041/profile',         host:'api.example.com', grp:3,  sa:200, sb:200, sc:200, simAB:100.0, simAC:100.0, simBC:100.0},
+  {id:2,  method:'GET',    url:'/api/v2/invoice/2024-INV-8842',     host:'api.example.com', grp:12, sa:200, sb:200, sc:200, simAB:100.0, simAC:100.0, simBC:100.0},
+  {id:3,  method:'GET',    url:'/api/v1/order/88421/detail',        host:'api.example.com', grp:7,  sa:200, sb:200, sc:200, simAB:98.2,  simAC:98.2,  simBC:99.1},
+  {id:4,  method:'POST',   url:'/api/v2/messages/send',             host:'api.example.com', grp:1,  sa:201, sb:201, sc:201, simAB:100.0, simAC:100.0, simBC:100.0},
+  {id:5,  method:'GET',    url:'/api/v1/admin/users/list',          host:'api.example.com', grp:1,  sa:200, sb:403, sc:200, simAB:4.1,   simAC:88.6,  simBC:3.8},
+  {id:6,  method:'GET',    url:'/api/v2/report/monthly?dept=fin',   host:'api.example.com', grp:4,  sa:200, sb:200, sc:200, simAB:87.3,  simAC:91.2,  simBC:89.4},
+  {id:7,  method:'GET',    url:'/api/v2/document/FIN-2024-0123.pdf',host:'api.example.com', grp:1,  sa:200, sb:403, sc:200, simAB:2.7,   simAC:82.4,  simBC:2.5},
+  {id:8,  method:'PUT',    url:'/api/v2/user/1041/settings',        host:'api.example.com', grp:1,  sa:200, sb:200, sc:200, simAB:91.0,  simAC:94.5,  simBC:92.3},
+  {id:9,  method:'GET',    url:'/api/v1/analytics/dashboard',       host:'api.example.com', grp:2,  sa:200, sb:200, sc:200, simAB:82.5,  simAC:95.1,  simBC:84.0},
+  {id:10, method:'DELETE', url:'/api/v2/comment/3317',              host:'api.example.com', grp:1,  sa:204, sb:403, sc:204, simAB:0.0,   simAC:0.0,   simBC:0.0},
+  {id:11, method:'GET',    url:'/api/v2/notification/inbox',        host:'api.example.com', grp:1,  sa:200, sb:200, sc:200, simAB:100.0, simAC:100.0, simBC:100.0},
+  {id:12, method:'GET',    url:'/api/v1/file/export?format=csv',    host:'api.example.com', grp:3,  sa:200, sb:403, sc:200, simAB:3.2,   simAC:86.7,  simBC:3.0},
+  {id:13, method:'POST',   url:'/api/v2/payment/checkout',          host:'api.example.com', grp:1,  sa:200, sb:200, sc:200, simAB:84.1,  simAC:89.0,  simBC:86.5},
+  {id:14, method:'GET',    url:'/api/v2/contract/CTR-2024-991',     host:'api.example.com', grp:5,  sa:200, sb:200, sc:200, simAB:100.0, simAC:100.0, simBC:100.0},
+  {id:15, method:'GET',    url:'/api/v1/config/app-settings',       host:'api.example.com', grp:1,  sa:200, sb:200, sc:403, simAB:22.8,  simAC:5.1,   simBC:4.9},
 ];
 
 const GROUPED = {
-  1:  ['/api/v2/user/1041/profile', '/api/v2/user/5872/profile', '/api/v2/user/9901/profile'],
+  1:  ['/api/v2/user/1041/profile','/api/v2/user/5872/profile','/api/v2/user/9901/profile'],
   2:  ['/api/v2/invoice/2024-INV-8842','/api/v2/invoice/2024-INV-7731','/api/v2/invoice/2024-INV-6612',
-       '/api/v2/invoice/2023-INV-1190','/api/v2/invoice/2023-INV-0041',
-       '/api/v2/invoice/2023-INV-9932','/api/v2/invoice/2023-INV-8810',
-       '/api/v2/invoice/2023-INV-7620','/api/v2/invoice/2023-INV-5540',
+       '/api/v2/invoice/2023-INV-1190','/api/v2/invoice/2023-INV-0041','/api/v2/invoice/2023-INV-9932',
+       '/api/v2/invoice/2023-INV-8810','/api/v2/invoice/2023-INV-7620','/api/v2/invoice/2023-INV-5540',
        '/api/v2/invoice/2023-INV-4420','/api/v2/invoice/2023-INV-3310','/api/v2/invoice/2023-INV-2201'],
   3:  ['/api/v1/order/88421/detail','/api/v1/order/77310/detail','/api/v1/order/66209/detail',
        '/api/v1/order/55108/detail','/api/v1/order/44007/detail','/api/v1/order/33906/detail','/api/v1/order/22805/detail'],
@@ -891,33 +907,131 @@ const GROUPED = {
        '/api/v2/contract/CTR-2023-660','/api/v2/contract/CTR-2023-551'],
 };
 
+// pair config
+const PAIR_CONFIG = {
+  ab: { key:'simAB', st1:'sa', st2:'sb', badge1:'badge-a', badge2:'badge-b', label1:'A', label2:'B', note:'A 요청을 기준으로 B 응답과 비교', diffNote:'A-B', activeClass:'active-ab' },
+  ac: { key:'simAC', st1:'sa', st2:'sc', badge1:'badge-a', badge2:'badge-c', label1:'A', label2:'C', note:'A 요청을 기준으로 Admin(C) 응답과 비교', diffNote:'A-C', activeClass:'active-ac' },
+  bc: { key:'simBC', st1:'sb', st2:'sc', badge1:'badge-b', badge2:'badge-c', label1:'B', label2:'C', note:'B 요청을 기준으로 Admin(C) 응답과 비교', diffNote:'B-C', activeClass:'active-bc' },
+};
+
+let currentPair = 'ab';
 let currentFilter = 'all';
 let searchVal = '';
 let selectedRow = 1;
 
-function getSimColor(sim, verdict) {
+function getVerdict(sim) {
+  if (sim >= 80) return sim >= 99.9 ? 'SAME' : 'SIMILAR';
+  return 'DIFFERENCE';
+}
+
+function getSimColor(verdict) {
   if (verdict === 'SAME') return '#c0392b';
   if (verdict === 'SIMILAR') return '#e67e22';
   return '#27ae60';
 }
 
+function setPair(pair) {
+  currentPair = pair;
+  const cfg = PAIR_CONFIG[pair];
+
+  // update pair buttons
+  ['ab','ac','bc'].forEach(p => {
+    const btn = document.getElementById('pair-'+p);
+    btn.className = 'pair-btn';
+    if (p === pair) btn.classList.add(PAIR_CONFIG[p].activeClass);
+  });
+
+  // update note
+  document.getElementById('pair-note').textContent = cfg.note;
+
+  // update table headers
+  document.getElementById('th-st1').innerHTML =
+    `<span class="badge-user ${cfg.badge1}" style="font-size:9px;padding:1px 4px">${cfg.label1}</span> 상태`;
+  document.getElementById('th-st2').innerHTML =
+    `<span class="badge-user ${cfg.badge2}" style="font-size:9px;padding:1px 4px">${cfg.label2}</span> 상태`;
+
+  // update detail tab labels
+  document.getElementById('dtab-p1').innerHTML =
+    `<span class="badge-user ${cfg.badge1}" style="font-size:9px;padding:1px 4px">${cfg.label1}</span> ${cfg.label1 === 'A' ? 'User A' : cfg.label1 === 'B' ? 'User B' : 'Admin'}`;
+  document.getElementById('dtab-p2').innerHTML =
+    `<span class="badge-user ${cfg.badge2}" style="font-size:9px;padding:1px 4px">${cfg.label2}</span> ${cfg.label2 === 'A' ? 'User A' : cfg.label2 === 'B' ? 'User B' : 'Admin'}`;
+
+  // update diff note
+  const selRow = ROWS.find(r => r.id === selectedRow);
+  if (selRow) {
+    const sim = selRow[cfg.key];
+    const verdict = getVerdict(sim);
+    document.getElementById('diff-note').textContent =
+      `${cfg.diffNote} ${verdict}(${sim.toFixed(0)}%) — 선택된 비교 쌍 결과`;
+  }
+
+  renderTable();
+  updateSummaryCounts();
+}
+
+function updateSummaryCounts() {
+  const cfg = PAIR_CONFIG[currentPair];
+  let same = 0, similar = 0, diff = 0;
+  ROWS.forEach(r => {
+    const v = getVerdict(r[cfg.key]);
+    if (v === 'SAME') same++;
+    else if (v === 'SIMILAR') similar++;
+    else diff++;
+  });
+  document.getElementById('cnt-same').textContent = same;
+  document.getElementById('cnt-similar').textContent = similar;
+  document.getElementById('cnt-diff').textContent = diff;
+  // update filter button labels
+  const total = ROWS.length;
+  document.getElementById('fbtn-all').textContent = '전체 ' + total;
+  document.getElementById('fbtn-same').textContent = 'SAME ' + same;
+  document.getElementById('fbtn-similar').textContent = 'SIMILAR ' + similar;
+  document.getElementById('fbtn-diff').textContent = 'DIFFERENCE ' + diff;
+}
+
+function setFilter(el, type) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  currentFilter = type;
+  renderTable();
+}
+
+function filterTable(val) {
+  searchVal = val.toLowerCase();
+  renderTable();
+}
+
 function renderTable() {
+  const cfg = PAIR_CONFIG[currentPair];
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
+
   ROWS.forEach(r => {
-    const v = r.verdict.toLowerCase().replace('same','same').replace('similar','similar').replace('difference','diff');
-    if (currentFilter !== 'all' && v !== currentFilter) return;
+    const sim = r[cfg.key];
+    const verdict = getVerdict(sim);
+    const vLow = verdict.toLowerCase().replace('difference','diff');
+
+    if (currentFilter !== 'all' && vLow !== currentFilter) return;
     if (searchVal && !r.url.toLowerCase().includes(searchVal) && !r.host.toLowerCase().includes(searchVal)) return;
 
-    const simColor = getSimColor(r.sim, r.verdict);
-    const vClass = r.verdict === 'SAME' ? 'v-same' : r.verdict === 'SIMILAR' ? 'v-similar' : 'v-diff';
+    const simColor = getSimColor(verdict);
+    const vClass = verdict === 'SAME' ? 'v-same' : verdict === 'SIMILAR' ? 'v-similar' : 'v-diff';
     const mClass = r.method === 'GET' ? 'method-get' : r.method === 'POST' ? 'method-post' : r.method === 'PUT' ? 'method-put' : 'method-del';
-    const saClass = r.sa < 300 ? 'status-ok' : r.sa < 400 ? 'status-rdr' : 'status-err';
-    const sbClass = r.sb < 300 ? 'status-ok' : r.sb < 400 ? 'status-rdr' : 'status-err';
-    const grpTxt  = r.grp > 1 ? `<span class="grp-badge" onclick="showDrill(event,${r.id},${r.grp})">${r.grp}</span>` : '<span style="color:#444">—</span>';
 
-    const simPct = Math.round(r.sim);
+    const st1Val = r[cfg.st1];
+    const st2Val = r[cfg.st2];
+    const st1Class = st1Val < 300 ? 'status-ok' : st1Val < 400 ? 'status-rdr' : 'status-err';
+    const st2Class = st2Val < 300 ? 'status-ok' : st2Val < 400 ? 'status-rdr' : 'status-err';
+
+    const grpTxt = r.grp > 1
+      ? `<span class="grp-badge" onclick="showDrill(event,${r.id},${r.grp})">${r.grp}</span>`
+      : '<span style="color:#444">—</span>';
+
+    const simPct = Math.round(sim);
     const simFill = `background:${simColor};width:${simPct}%`;
+
+    const badge1 = `<span class="badge-user ${cfg.badge1}" style="font-size:8px;padding:1px 3px">${cfg.label1}</span>`;
+    const badge2 = `<span class="badge-user ${cfg.badge2}" style="font-size:8px;padding:1px 3px">${cfg.label2}</span>`;
 
     const tr = document.createElement('tr');
     if (r.id === selectedRow) tr.classList.add('selected');
@@ -927,12 +1041,12 @@ function renderTable() {
       <td><span class="method-badge ${mClass}">${r.method}</span></td>
       <td class="url-cell"><span class="host">${r.host}</span><span class="path">${r.url}</span></td>
       <td style="text-align:center">${grpTxt}</td>
-      <td style="text-align:center"><span class="${saClass}">${r.sa}</span></td>
-      <td style="text-align:center"><span class="${sbClass}">${r.sb}</span></td>
-      <td><span class="verdict-badge ${vClass}">${r.verdict}</span></td>
+      <td style="text-align:center"><span class="${st1Class}">${st1Val}</span></td>
+      <td style="text-align:center"><span class="${st2Class}">${st2Val}</span></td>
+      <td><span class="verdict-badge ${vClass}">${verdict}</span></td>
       <td>
         <div class="sim-bar">
-          <span class="sim-val" style="color:${simColor}">${r.sim.toFixed(1)}%</span>
+          <span class="sim-val" style="color:${simColor};font-size:9px">${badge1}↔${badge2} ${simPct}%</span>
           <div class="sim-track"><div class="sim-fill" style="${simFill}"></div></div>
         </div>
       </td>`;
@@ -940,12 +1054,17 @@ function renderTable() {
       document.querySelectorAll('#tbody tr').forEach(t => t.classList.remove('selected'));
       tr.classList.add('selected');
       selectedRow = r.id;
+      // update diff note for newly selected row
+      const cfg2 = PAIR_CONFIG[currentPair];
+      const sim2 = r[cfg2.key];
+      const v2 = getVerdict(sim2);
+      document.getElementById('diff-note').textContent =
+        `${cfg2.diffNote} ${v2}(${sim2.toFixed(0)}%) — 선택된 비교 쌍 결과`;
     });
     tbody.appendChild(tr);
   });
 }
 
-// drill-down
 function showDrill(e, rowId, grp) {
   e.stopPropagation();
   const dd = document.getElementById('drilldown');
@@ -969,6 +1088,7 @@ document.addEventListener('click', () => {
 
 // init
 renderTable();
+updateSummaryCounts();
 </script>
 </body>
 </html>
