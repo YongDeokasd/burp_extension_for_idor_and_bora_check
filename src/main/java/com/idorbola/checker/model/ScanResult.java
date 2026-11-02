@@ -1,5 +1,6 @@
 package com.idorbola.checker.model;
 
+import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.responses.HttpResponse;
 
 import java.util.HashMap;
@@ -9,12 +10,22 @@ public class ScanResult {
 
     private final int rowIndex;
     private final RequestGroup group;
+    private final Map<String, HttpRequest> requests = new HashMap<>();
     private final Map<String, HttpResponse> responses = new HashMap<>();
     private final Map<String, Map<String, Float>> similarities = new HashMap<>();
 
     public ScanResult(int rowIndex, RequestGroup group) {
         this.rowIndex = rowIndex;
         this.group = group;
+    }
+
+    public void putRequest(String profileId, HttpRequest request) {
+        requests.put(profileId, request);
+    }
+
+    public HttpRequest getRequest(String profileId) {
+        HttpRequest sent = requests.get(profileId);
+        return sent != null ? sent : group.getRepresentative();
     }
 
     public void putResponse(String profileId, HttpResponse response) {
