@@ -335,21 +335,28 @@
     font-size: 11px; color: var(--text-dim);
     margin-right: 4px; white-space: nowrap;
   }
-  .pair-btn {
-    padding: 3px 12px;
-    font-size: 11px; font-weight: 600;
+  .pair-select {
+    appearance: none;
+    background: #252525;
     border: 1px solid var(--border);
-    border-radius: 10px;
-    background: transparent;
-    color: var(--text-dim);
+    border-radius: 3px;
+    color: var(--text);
+    padding: 3px 22px 3px 8px;
+    font-size: 11px;
+    font-family: var(--font-ui);
     cursor: pointer;
-    user-select: none;
-    transition: .15s;
+    outline: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    min-width: 110px;
   }
-  .pair-btn:hover { border-color: #555; color: var(--text); background: #2a2a2a; }
-  .pair-btn.active-ab { background: #1a2a3c; color: #7ab8f5; border-color: #3a6a9c; }
-  .pair-btn.active-ac { background: #2a1a2e; color: #f57adb; border-color: #7a3a7c; }
-  .pair-btn.active-bc { background: #1a2e1a; color: #7af5a0; border-color: #3a7c3a; }
+  .pair-select:focus { border-color: var(--accent); }
+  .pair-select option { background: #252525; color: var(--text); }
+  .pair-vs {
+    font-size: 12px; font-weight: 700; color: var(--text-dim);
+    padding: 0 2px;
+  }
   .pair-note {
     margin-left: auto; font-size: 10px; color: var(--text-dim); font-style: italic;
   }
@@ -726,24 +733,17 @@
         <!-- profile pair selector -->
         <div class="pair-bar">
           <span class="pair-label">비교 프로필:</span>
-          <button class="pair-btn active-ab" id="pair-ab" onclick="setPair('ab')">
-            <span class="badge-user badge-a" style="font-size:9px;padding:1px 4px">A</span>
-            &nbsp;↔&nbsp;
-            <span class="badge-user badge-b" style="font-size:9px;padding:1px 4px">B</span>
-            &nbsp;User A vs User B
-          </button>
-          <button class="pair-btn" id="pair-ac" onclick="setPair('ac')">
-            <span class="badge-user badge-a" style="font-size:9px;padding:1px 4px">A</span>
-            &nbsp;↔&nbsp;
-            <span class="badge-user badge-c" style="font-size:9px;padding:1px 4px">C</span>
-            &nbsp;User A vs Admin
-          </button>
-          <button class="pair-btn" id="pair-bc" onclick="setPair('bc')">
-            <span class="badge-user badge-b" style="font-size:9px;padding:1px 4px">B</span>
-            &nbsp;↔&nbsp;
-            <span class="badge-user badge-c" style="font-size:9px;padding:1px 4px">C</span>
-            &nbsp;User B vs Admin
-          </button>
+          <select class="pair-select" id="select-p1" onchange="onSelectChange()">
+            <option value="a" selected>A — User A (Victim)</option>
+            <option value="b">B — User B (Attacker)</option>
+            <option value="c">C — Admin</option>
+          </select>
+          <span class="pair-vs">↔</span>
+          <select class="pair-select" id="select-p2" onchange="onSelectChange()">
+            <option value="a">A — User A (Victim)</option>
+            <option value="b" selected>B — User B (Attacker)</option>
+            <option value="c">C — Admin</option>
+          </select>
           <span class="pair-note" id="pair-note">A 요청을 기준으로 B 응답과 비교</span>
         </div>
 
@@ -907,62 +907,76 @@ const GROUPED = {
        '/api/v2/contract/CTR-2023-660','/api/v2/contract/CTR-2023-551'],
 };
 
-// pair config
-const PAIR_CONFIG = {
-  ab: { key:'simAB', st1:'sa', st2:'sb', badge1:'badge-a', badge2:'badge-b', label1:'A', label2:'B', note:'A 요청을 기준으로 B 응답과 비교', diffNote:'A-B', activeClass:'active-ab' },
-  ac: { key:'simAC', st1:'sa', st2:'sc', badge1:'badge-a', badge2:'badge-c', label1:'A', label2:'C', note:'A 요청을 기준으로 Admin(C) 응답과 비교', diffNote:'A-C', activeClass:'active-ac' },
-  bc: { key:'simBC', st1:'sb', st2:'sc', badge1:'badge-b', badge2:'badge-c', label1:'B', label2:'C', note:'B 요청을 기준으로 Admin(C) 응답과 비교', diffNote:'B-C', activeClass:'active-bc' },
+const PROFILE_META = {
+  a: { badge:'badge-a', label:'A', name:'User A' },
+  b: { badge:'badge-b', label:'B', name:'User B' },
+  c: { badge:'badge-c', label:'C', name:'Admin'  },
 };
 
-let currentPair = 'ab';
+const SIM_KEY = { a:{ a:null, b:'simAB', c:'simAC' }, b:{ a:'simAB', b:null, c:'simBC' }, c:{ a:'simAC', b:'simBC', c:null } };
+const ST_KEY  = { a:'sa', b:'sb', c:'sc' };
+
+let currentP1 = 'a';
+let currentP2 = 'b';
 let currentFilter = 'all';
 let searchVal = '';
 let selectedRow = 1;
 
 function getVerdict(sim) {
-  if (sim >= 80) return sim >= 99.9 ? 'SAME' : 'SIMILAR';
+  if (sim >= 99.9) return 'SAME';
+  if (sim >= 80)   return 'SIMILAR';
   return 'DIFFERENCE';
 }
 
 function getSimColor(verdict) {
-  if (verdict === 'SAME') return '#c0392b';
+  if (verdict === 'SAME')    return '#c0392b';
   if (verdict === 'SIMILAR') return '#e67e22';
   return '#27ae60';
 }
 
-function setPair(pair) {
-  currentPair = pair;
-  const cfg = PAIR_CONFIG[pair];
+function getProfileName(p) {
+  return PROFILE_META[p].name;
+}
 
-  // update pair buttons
-  ['ab','ac','bc'].forEach(p => {
-    const btn = document.getElementById('pair-'+p);
-    btn.className = 'pair-btn';
-    if (p === pair) btn.classList.add(PAIR_CONFIG[p].activeClass);
-  });
+function onSelectChange() {
+  const p1 = document.getElementById('select-p1').value;
+  const p2 = document.getElementById('select-p2').value;
+  if (p1 === p2) {
+    // revert second dropdown to previous valid choice
+    const fallback = ['a','b','c'].find(p => p !== p1);
+    document.getElementById('select-p2').value = fallback;
+    currentP2 = fallback;
+  } else {
+    currentP2 = p2;
+  }
+  currentP1 = document.getElementById('select-p1').value;
+  applyPair();
+}
 
-  // update note
-  document.getElementById('pair-note').textContent = cfg.note;
+function applyPair() {
+  const m1 = PROFILE_META[currentP1];
+  const m2 = PROFILE_META[currentP2];
 
-  // update table headers
+  document.getElementById('pair-note').textContent =
+    `${m1.name}(${m1.label}) 요청을 기준으로 ${m2.name}(${m2.label}) 응답과 비교`;
+
   document.getElementById('th-st1').innerHTML =
-    `<span class="badge-user ${cfg.badge1}" style="font-size:9px;padding:1px 4px">${cfg.label1}</span> 상태`;
+    `<span class="badge-user ${m1.badge}" style="font-size:9px;padding:1px 4px">${m1.label}</span> 상태`;
   document.getElementById('th-st2').innerHTML =
-    `<span class="badge-user ${cfg.badge2}" style="font-size:9px;padding:1px 4px">${cfg.label2}</span> 상태`;
+    `<span class="badge-user ${m2.badge}" style="font-size:9px;padding:1px 4px">${m2.label}</span> 상태`;
 
-  // update detail tab labels
   document.getElementById('dtab-p1').innerHTML =
-    `<span class="badge-user ${cfg.badge1}" style="font-size:9px;padding:1px 4px">${cfg.label1}</span> ${cfg.label1 === 'A' ? 'User A' : cfg.label1 === 'B' ? 'User B' : 'Admin'}`;
+    `<span class="badge-user ${m1.badge}" style="font-size:9px;padding:1px 4px">${m1.label}</span> ${m1.name}`;
   document.getElementById('dtab-p2').innerHTML =
-    `<span class="badge-user ${cfg.badge2}" style="font-size:9px;padding:1px 4px">${cfg.label2}</span> ${cfg.label2 === 'A' ? 'User A' : cfg.label2 === 'B' ? 'User B' : 'Admin'}`;
+    `<span class="badge-user ${m2.badge}" style="font-size:9px;padding:1px 4px">${m2.label}</span> ${m2.name}`;
 
-  // update diff note
   const selRow = ROWS.find(r => r.id === selectedRow);
   if (selRow) {
-    const sim = selRow[cfg.key];
+    const simKey = SIM_KEY[currentP1][currentP2];
+    const sim = simKey ? selRow[simKey] : 100;
     const verdict = getVerdict(sim);
     document.getElementById('diff-note').textContent =
-      `${cfg.diffNote} ${verdict}(${sim.toFixed(0)}%) — 선택된 비교 쌍 결과`;
+      `${m1.label}-${m2.label} ${verdict}(${sim.toFixed(0)}%) — 선택된 비교 쌍 결과`;
   }
 
   renderTable();
@@ -970,10 +984,11 @@ function setPair(pair) {
 }
 
 function updateSummaryCounts() {
-  const cfg = PAIR_CONFIG[currentPair];
+  const simKey = SIM_KEY[currentP1][currentP2];
   let same = 0, similar = 0, diff = 0;
   ROWS.forEach(r => {
-    const v = getVerdict(r[cfg.key]);
+    const sim = simKey ? r[simKey] : 100;
+    const v = getVerdict(sim);
     if (v === 'SAME') same++;
     else if (v === 'SIMILAR') similar++;
     else diff++;
@@ -1002,12 +1017,14 @@ function filterTable(val) {
 }
 
 function renderTable() {
-  const cfg = PAIR_CONFIG[currentPair];
+  const simKey = SIM_KEY[currentP1][currentP2];
+  const m1 = PROFILE_META[currentP1];
+  const m2 = PROFILE_META[currentP2];
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
 
   ROWS.forEach(r => {
-    const sim = r[cfg.key];
+    const sim = simKey ? r[simKey] : 100;
     const verdict = getVerdict(sim);
     const vLow = verdict.toLowerCase().replace('difference','diff');
 
@@ -1018,8 +1035,8 @@ function renderTable() {
     const vClass = verdict === 'SAME' ? 'v-same' : verdict === 'SIMILAR' ? 'v-similar' : 'v-diff';
     const mClass = r.method === 'GET' ? 'method-get' : r.method === 'POST' ? 'method-post' : r.method === 'PUT' ? 'method-put' : 'method-del';
 
-    const st1Val = r[cfg.st1];
-    const st2Val = r[cfg.st2];
+    const st1Val = r[ST_KEY[currentP1]];
+    const st2Val = r[ST_KEY[currentP2]];
     const st1Class = st1Val < 300 ? 'status-ok' : st1Val < 400 ? 'status-rdr' : 'status-err';
     const st2Class = st2Val < 300 ? 'status-ok' : st2Val < 400 ? 'status-rdr' : 'status-err';
 
@@ -1030,8 +1047,8 @@ function renderTable() {
     const simPct = Math.round(sim);
     const simFill = `background:${simColor};width:${simPct}%`;
 
-    const badge1 = `<span class="badge-user ${cfg.badge1}" style="font-size:8px;padding:1px 3px">${cfg.label1}</span>`;
-    const badge2 = `<span class="badge-user ${cfg.badge2}" style="font-size:8px;padding:1px 3px">${cfg.label2}</span>`;
+    const badge1 = `<span class="badge-user ${m1.badge}" style="font-size:8px;padding:1px 3px">${m1.label}</span>`;
+    const badge2 = `<span class="badge-user ${m2.badge}" style="font-size:8px;padding:1px 3px">${m2.label}</span>`;
 
     const tr = document.createElement('tr');
     if (r.id === selectedRow) tr.classList.add('selected');
@@ -1054,12 +1071,11 @@ function renderTable() {
       document.querySelectorAll('#tbody tr').forEach(t => t.classList.remove('selected'));
       tr.classList.add('selected');
       selectedRow = r.id;
-      // update diff note for newly selected row
-      const cfg2 = PAIR_CONFIG[currentPair];
-      const sim2 = r[cfg2.key];
-      const v2 = getVerdict(sim2);
+      const sk = SIM_KEY[currentP1][currentP2];
+      const s2 = sk ? r[sk] : 100;
+      const v2 = getVerdict(s2);
       document.getElementById('diff-note').textContent =
-        `${cfg2.diffNote} ${v2}(${sim2.toFixed(0)}%) — 선택된 비교 쌍 결과`;
+        `${m1.label}-${m2.label} ${v2}(${s2.toFixed(0)}%) — 선택된 비교 쌍 결과`;
     });
     tbody.appendChild(tr);
   });
@@ -1087,8 +1103,7 @@ document.addEventListener('click', () => {
 });
 
 // init
-renderTable();
-updateSummaryCounts();
+applyPair();
 </script>
 </body>
 </html>
