@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDOR/BOLA Checker – Burp Extension</title>
+<style>
+  :root {
+    --bg:          #1e1e1e;
+    --panel:       #252525;
+    --panel-alt:   #2c2c2c;
+    --border:      #3a3a3a;
+    --border-light:#464646;
+    --text:        #d4d4d4;
+    --text-dim:    #888;
+    --text-bright: #f0f0f0;
+    --accent:      #e0721e;
+    --accent-dim:  #a0500e;
+    --tab-active:  #2c2c2c;
+    --tab-hover:   #282828;
+    --row-hover:   #2e2e2e;
+    --row-sel:     #1e3a5c;
+    --same:        #c0392b;
+    --same-bg:     rgba(192,57,43,.15);
+    --similar:     #e67e22;
+    --similar-bg:  rgba(230,126,34,.13);
+    --diff:        #27ae60;
+    --diff-bg:     rgba(39,174,96,.12);
+    --badge-r:     3px;
+    --font-mono:   'Consolas', 'Menlo', 'Courier New', monospace;
+    --font-ui:     'Segoe UI', 'Arial', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    height: 100%;
+    min-height: 600px;
+    overflow: hidden;
+  }
+
+  .burp-chrome {
+    display: flex; flex-direction: column;
+    height: 100vh; min-height: 600px;
+    border: 1px solid #111;
+  }
+
+  .title-bar {
+    background: #161616;
+    padding: 5px 10px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid #111;
+    font-size: 11px; color: #666;
+    flex-shrink: 0;
+  }
+  .title-bar .dot { width:10px;height:10px;border-radius:50%;background:#555; }
+  .title-bar .logo { color: var(--accent); font-weight: 700; font-size: 12px; margin-right:6px; }
+
+  .burp-tabs {
+    background: #1a1a1a;
+    display: flex; align-items: flex-end;
+    padding: 0 8px;
+    border-bottom: 2px solid var(--accent);
+    flex-shrink: 0;
+    gap: 2px;
+  }
+  .burp-tab {
+    padding: 6px 14px;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: 4px 4px 0 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    user-select: none;
+  }
+  .burp-tab:hover { background: var(--tab-hover); color: var(--text); }
+  .burp-tab.active {
+    background: var(--tab-active);
+    color: var(--text-bright);
+    border-color: var(--border);
+    border-bottom: 2px solid var(--tab-active);
+    margin-bottom: -2px;
+    font-weight: 600;
+  }
+  .burp-tab.ext-tab { color: var(--accent); }
+  .burp-tab.ext-tab.active { background: #2a1e0e; border-color: var(--accent-dim); }
+
+  .burp-body { display: flex; flex: 1; overflow: hidden; }
+
+  .ext-wrap { display: flex; flex-direction: column; width: 100%; overflow: hidden; }
+
+  .ext-tabs {
+    background: #222;
+    display: flex; gap: 0;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    padding: 4px 8px 0;
+  }
+  .ext-tab-btn {
+    padding: 5px 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-radius: 3px 3px 0 0;
+    border-bottom: none;
+    background: transparent;
+    user-select: none;
+  }
+  .ext-tab-btn:hover { background: var(--panel-alt); color: var(--text); }
+  .ext-tab-btn.active {
+    background: var(--panel);
+    color: var(--text-bright);
+    border-color: var(--border);
+    border-bottom: 1px solid var(--panel);
+    margin-bottom: -1px;
+  }
+
+  /* ── Settings tab ── */
+  #tab-settings {
+    flex: 1; display: flex; overflow: hidden;
+  }
+  .settings-sidebar {
+    width: 160px; flex-shrink: 0;
+    background: #202020;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  .settings-sidebar .s-item {
+    padding: 7px 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+  .settings-sidebar .s-item:hover { background: var(--panel); color: var(--text); }
+  .settings-sidebar .s-item.active {
+    background: var(--panel);
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+  .settings-sidebar .s-sep {
+    height: 1px; background: var(--border); margin: 4px 0;
+  }
+
+  .settings-content {
+    flex: 1; overflow-y: auto; padding: 14px 16px;
+  }
+  .s-section { margin-bottom: 18px; }
+  .s-title {
+    font-size: 11px; font-weight: 700;
+    color: var(--accent); text-transform: uppercase;
+    letter-spacing: .7px;
+    margin-bottom: 10px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .s-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 7px;
+  }
+  .s-label { width: 160px; color: var(--text-dim); font-size: 11px; flex-shrink: 0; }
+  .s-input {
+    background: #1a1a1a;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    padding: 3px 7px;
+    font-size: 11px;
+    width: 70px;
+    outline: none;
+    font-family: var(--font-mono);
+  }
+  .s-input:focus { border-color: var(--accent); }
+  .s-note { font-size: 10px; color: var(--text-dim); margin-left: 2px; }
+
+  .profile-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+  .profile-table th {
+    background: #1a1a1a;
+    color: var(--text-dim);
+    padding: 5px 8px;
+    text-align: left;
+    font-weight: 600;
+    border: 1px solid var(--border);
+  }
+  .profile-table td {
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    color: var(--text);
+    background: var(--panel-alt);
+  }
+  .profile-table tr:hover td { background: var(--row-hover); }
+
+  .badge-user {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .badge-a { background: #1a4a7c; color: #7ab8f5; }
+  .badge-b { background: #1a4a2a; color: #7af5a0; }
+  .badge-c { background: #4a1a3c; color: #f57adb; }
+
+  .tag-list {
+    display: flex; flex-wrap: wrap; gap: 5px;
+    background: #1a1a1a; border: 1px solid var(--border);
+    border-radius: 3px; padding: 6px 8px;
+    min-height: 32px;
+  }
+  .tag {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: #333; border: 1px solid #4a4a4a;
+    border-radius: 3px; padding: 2px 6px;
+    font-size: 10px; color: var(--text);
+    font-family: var(--font-mono);
+  }
+  .tag .x { color: #888; cursor: pointer; font-size: 10px; }
+  .tag .x:hover { color: #f77; }
+
+  .exclusion-list {
+    background: #1a1a1a; border: 1px solid var(--border);
+    border-radius: 3px; padding: 6px 8px;
+    font-size: 11px; font-family: var(--font-mono);
+    color: #7ab8f5; line-height: 1.7;
+    min-height: 64px;
+  }
+
+  .btn {
+    padding: 3px 10px;
+    font-size: 11px;
+    border: 1px solid var(--border-light);
+    border-radius: 3px;
+    background: #333;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .btn:hover { background: #3c3c3c; border-color: #555; }
+  .btn.primary {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: #f0d090;
+  }
+  .btn.primary:hover { background: var(--accent); color: #fff; }
+
+  .toggle {
+    position: relative; width: 34px; height: 18px;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0;
+    background: #3a3a3a; border-radius: 18px;
+    cursor: pointer; transition: .2s;
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute;
+    width: 12px; height: 12px; border-radius: 50%;
+    left: 3px; top: 3px;
+    background: #888; transition: .2s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--accent-dim); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: var(--accent); }
+
+  /* ── Results tab ── */
+  #tab-results {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  .progress-bar-wrap {
+    background: #1e1e1e;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 12px;
+    flex-shrink: 0;
+  }
+  .progress-top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .progress-label { font-size: 11px; color: var(--text); }
+  .progress-label span { color: var(--accent); font-weight: 700; }
+  .progress-btns { display: flex; gap: 5px; }
+  .progress-track {
+    height: 5px; background: #333; border-radius: 3px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    border-radius: 3px; width: 62%; transition: width .3s;
+  }
+  .progress-meta {
+    display: flex; gap: 16px; margin-top: 4px;
+    font-size: 10px; color: var(--text-dim);
+  }
+  .progress-meta span b { color: var(--text); }
+
+  .summary-bar {
+    background: var(--panel-alt);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 12px;
+    display: flex; align-items: center; gap: 20px;
+    flex-shrink: 0;
+  }
+  .sum-item {
+    display: flex; align-items: center; gap: 5px; font-size: 11px;
+  }
+  .sum-item .label { color: var(--text-dim); }
+  .sum-item .val { font-weight: 700; font-family: var(--font-mono); }
+  .sum-item .val.same { color: var(--same); }
+  .sum-item .val.similar { color: var(--similar); }
+  .sum-item .val.diff { color: var(--diff); }
+  .sum-item .val.total { color: var(--text-bright); }
+  .sum-sep { width: 1px; height: 14px; background: var(--border); }
+  .export-btn { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+
+  /* ── Profile pair selector bar ── */
+  .pair-bar {
+    background: #1c1c1c;
+    border-bottom: 1px solid var(--border);
+    padding: 5px 10px;
+    display: flex; align-items: center; gap: 8px;
+    flex-shrink: 0;
+  }
+  .pair-label {
+    font-size: 11px; color: var(--text-dim);
+    margin-right: 4px; white-space: nowrap;
+  }
+  .pair-select {
+    appearance: none;
+    background: #252525;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    padding: 3px 22px 3px 8px;
+    font-size: 11px;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    outline: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    min-width: 110px;
+  }
+  .pair-select:focus { border-color: var(--accent); }
+  .pair-select option { background: #252525; color: var(--text); }
+  .pair-vs {
+    font-size: 12px; font-weight: 700; color: var(--text-dim);
+    padding: 0 2px;
+  }
+  .pair-note {
+    margin-left: auto; font-size: 10px; color: var(--text-dim); font-style: italic;
+  }
+
+  /* filter */
+  .filter-bar {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 5px 10px;
+    display: flex; align-items: center; gap: 7px;
+    flex-shrink: 0;
+  }
+  .filter-btn {
+    padding: 3px 10px;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+  }
+  .filter-btn:hover { border-color: #555; color: var(--text); }
+  .filter-btn.active { background: #2a2a2a; color: var(--text-bright); border-color: #555; }
+  .filter-btn.f-same.active { background: var(--same-bg); color: var(--same); border-color: var(--same); }
+  .filter-btn.f-sim.active  { background: var(--similar-bg); color: var(--similar); border-color: var(--similar); }
+  .filter-btn.f-diff.active { background: var(--diff-bg); color: var(--diff); border-color: var(--diff); }
+
+  .filter-search {
+    margin-left: auto;
+    background: #1a1a1a;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    padding: 3px 8px;
+    font-size: 11px;
+    outline: none;
+    width: 160px;
+    font-family: var(--font-mono);
+  }
+  .filter-search:focus { border-color: var(--accent); }
+
+  /* table */
+  .table-wrap {
+    flex: 1; overflow-y: auto; overflow-x: auto;
+    background: var(--panel);
+  }
+  table.results {
+    width: 100%; border-collapse: collapse;
+    font-size: 11px; table-layout: fixed;
+  }
+  table.results th {
+    background: #1e1e1e;
+    color: var(--text-dim);
+    padding: 5px 8px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    position: sticky; top: 0; z-index: 2;
+    white-space: nowrap; overflow: hidden;
+  }
+  table.results th:first-child { width: 36px; }
+  table.results .col-method  { width: 54px; }
+  table.results .col-grp     { width: 54px; text-align: center; }
+  table.results .col-st1     { width: 54px; text-align: center; }
+  table.results .col-st2     { width: 54px; text-align: center; }
+  table.results .col-verdict { width: 90px; }
+  table.results .col-sim     { width: 100px; text-align: right; }
+
+  table.results td {
+    padding: 4px 8px;
+    border-bottom: 1px solid #2a2a2a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  table.results tr:hover td { background: var(--row-hover); }
+  table.results tr.selected td { background: var(--row-sel) !important; color: var(--text-bright); }
+
+  .method-badge {
+    display: inline-block; padding: 1px 5px;
+    border-radius: 2px; font-weight: 700; font-size: 10px;
+    font-family: var(--font-mono);
+  }
+  .method-get  { background: #1a3a5c; color: #7ab8f5; }
+  .method-post { background: #2a3a1a; color: #a8d878; }
+  .method-put  { background: #3a2a1a; color: #f5c07a; }
+  .method-del  { background: #3a1a1a; color: #f57a7a; }
+
+  .url-cell { font-family: var(--font-mono); font-size: 10px; color: #aaa; }
+  .url-cell .host { color: #6ab0e8; }
+  .url-cell .path { color: var(--text); }
+
+  .grp-badge {
+    display: inline-block;
+    background: #2a2a3a; color: #8a8aff;
+    border-radius: 10px;
+    padding: 1px 6px; font-size: 10px;
+    border: 1px solid #3a3a5a;
+    cursor: pointer;
+  }
+  .grp-badge:hover { background: #333366; }
+
+  .status-ok  { color: #7af5a0; font-family: var(--font-mono); }
+  .status-err { color: #f57a7a; font-family: var(--font-mono); }
+  .status-rdr { color: #f5d07a; font-family: var(--font-mono); }
+
+  .verdict-badge {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 3px; font-weight: 700; font-size: 10px;
+    letter-spacing: .3px;
+  }
+  .v-same    { background: var(--same-bg);    color: var(--same);    border: 1px solid #c03928; }
+  .v-similar { background: var(--similar-bg); color: var(--similar); border: 1px solid #e67e22; }
+  .v-diff    { background: var(--diff-bg);    color: var(--diff);    border: 1px solid #27ae60; }
+
+  .sim-bar {
+    display: flex; align-items: center; gap: 5px;
+    justify-content: flex-end;
+  }
+  .sim-val { font-family: var(--font-mono); font-size: 10px; }
+  .sim-track { width: 36px; height: 4px; background: #333; border-radius: 2px; }
+  .sim-fill  { height: 100%; border-radius: 2px; }
+
+  /* bottom detail */
+  .detail-wrap {
+    flex-shrink: 0; height: 180px;
+    background: #1e1e1e;
+    border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .detail-tabs {
+    display: flex; background: #1a1a1a;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .d-tab {
+    padding: 4px 12px; font-size: 11px;
+    color: var(--text-dim); cursor: pointer;
+    border-right: 1px solid var(--border);
+    border-bottom: 2px solid transparent;
+    user-select: none;
+  }
+  .d-tab:hover { color: var(--text); background: #202020; }
+  .d-tab.active { color: var(--text-bright); border-bottom-color: var(--accent); background: var(--panel); }
+
+  .detail-body {
+    flex: 1; overflow: auto; padding: 8px 12px;
+    font-family: var(--font-mono); font-size: 10px; line-height: 1.6;
+    color: #bbb;
+  }
+  .detail-body .kw { color: #c792ea; }
+  .detail-body .str { color: #c3e88d; }
+  .detail-body .num { color: #f78c6c; }
+  .detail-body .key { color: #82aaff; }
+
+  .diff-line-add { color: #7af5a0; background: rgba(39,174,96,.1); display: block; padding: 0 4px; }
+  .diff-line-del { color: #f57a7a; background: rgba(192,57,43,.1); display: block; padding: 0 4px; }
+  .diff-line-ctx { color: #666; display: block; padding: 0 4px; }
+
+  .drilldown {
+    position: absolute; z-index: 10;
+    background: #222; border: 1px solid var(--border);
+    border-radius: 4px; padding: 8px 10px;
+    font-size: 10px; font-family: var(--font-mono);
+    box-shadow: 0 4px 16px rgba(0,0,0,.5);
+    max-width: 360px; display: none;
+  }
+  .drilldown.show { display: block; }
+  .drilldown .dd-title { color: var(--accent); font-weight: 700; margin-bottom: 5px; }
+  .drilldown .dd-item { color: #aaa; line-height: 1.8; }
+  .drilldown .dd-item.rep { color: #7ab8f5; }
+  .drilldown .dd-rep { color: var(--text-dim); font-size: 9px; }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #1a1a1a; }
+  ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #4a4a4a; }
+</style>
+</head>
+<body>
+
+<div class="burp-chrome">
+
+  <div class="title-bar">
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    <span class="logo">Burp Suite Professional</span>
+    <span>v2024.10.1 · yongdeokasd</span>
+  </div>
+
+  <div class="burp-tabs">
+    <div class="burp-tab">Dashboard</div>
+    <div class="burp-tab">Target</div>
+    <div class="burp-tab">Proxy</div>
+    <div class="burp-tab">Scanner</div>
+    <div class="burp-tab">Intruder</div>
+    <div class="burp-tab">Repeater</div>
+    <div class="burp-tab ext-tab active">IDOR/BOLA Checker</div>
+    <div class="burp-tab">Decoder</div>
+  </div>
+
+  <div class="burp-body">
+    <div class="ext-wrap">
+
+      <div class="ext-tabs">
+        <button class="ext-tab-btn" id="btn-settings" onclick="switchTab('settings')">설정</button>
+        <button class="ext-tab-btn active" id="btn-results" onclick="switchTab('results')">결과</button>
+      </div>
+
+      <!-- ── SETTINGS TAB ── -->
+      <div id="tab-settings" style="display:none;">
+        <div class="settings-sidebar">
+          <div class="s-item active" onclick="selectSection(this,'sec-profile')">사용자 프로필</div>
+          <div class="s-item" onclick="selectSection(this,'sec-replay')">재전송 설정</div>
+          <div class="s-item" onclick="selectSection(this,'sec-dedup')">중복 제거</div>
+          <div class="s-sep"></div>
+          <div class="s-item" onclick="selectSection(this,'sec-exclude')">제외 엔드포인트</div>
+          <div class="s-item" onclick="selectSection(this,'sec-static')">정적 자원 필터</div>
+          <div class="s-sep"></div>
+          <div class="s-item" onclick="selectSection(this,'sec-compare')">비교 설정</div>
+        </div>
+
+        <div class="settings-content">
+
+          <div id="sec-profile" class="s-section">
+            <div class="s-title">사용자 프로필 (User Profiles)</div>
+            <table class="profile-table">
+              <thead>
+                <tr><th>#</th><th>이름</th><th>Cookie (미리보기)</th><th>커스텀 헤더</th><th>Action</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="badge-user badge-a">A</span></td>
+                  <td>User A (Victim)</td>
+                  <td style="font-family:var(--font-mono);font-size:10px;color:#888">session=aA1bB2cC3...; auth_token=eyJhb...</td>
+                  <td style="color:var(--text-dim)">Authorization ×1</td>
+                  <td><button class="btn">편집</button> <button class="btn">삭제</button></td>
+                </tr>
+                <tr>
+                  <td><span class="badge-user badge-b">B</span></td>
+                  <td>User B (Attacker)</td>
+                  <td style="font-family:var(--font-mono);font-size:10px;color:#888">session=xX9yY8zZ7...; auth_token=eyJhb...</td>
+                  <td style="color:var(--text-dim)">Authorization ×1</td>
+                  <td><button class="btn">편집</button> <button class="btn">삭제</button></td>
+                </tr>
+                <tr>
+                  <td><span class="badge-user badge-c">C</span></td>
+                  <td>Admin</td>
+                  <td style="font-family:var(--font-mono);font-size:10px;color:#888">session=mM5nN6oO7...; role=admin</td>
+                  <td style="color:var(--text-dim)">X-Role ×1</td>
+                  <td><button class="btn">편집</button> <button class="btn">삭제</button></td>
+                </tr>
+              </tbody>
+            </table>
+            <button class="btn primary">+ 프로필 추가</button>
+          </div>
+
+          <div id="sec-replay" class="s-section" style="display:none;">
+            <div class="s-title">재전송 설정</div>
+            <div class="s-row"><span class="s-label">Thread Pool 크기</span><input class="s-input" value="10"><span class="s-note">threads</span></div>
+            <div class="s-row"><span class="s-label">Rate Limit (전체)</span><input class="s-input" value="20"><span class="s-note">req/s · 프로필 3개 × 20 = 서버 60 req/s</span></div>
+            <div class="s-row"><span class="s-label">프로필 간 딜레이</span><input class="s-input" value="0"><span class="s-note">ms</span></div>
+            <div class="s-row"><span class="s-label">Timeout</span><input class="s-input" value="10"><span class="s-note">초</span></div>
+          </div>
+
+          <div id="sec-dedup" class="s-section" style="display:none;">
+            <div class="s-title">중복 제거 설정</div>
+            <div class="s-row">
+              <span class="s-label">중복 제거 활성화</span>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-slider"></div></label>
+              <span class="s-note">비활성화 시 모든 URL 개별 테스트</span>
+            </div>
+            <div class="s-row" style="margin-top:8px;color:var(--text-dim);font-size:10px;">
+              Fingerprint = SHA256(Method + 정규화경로 + 쿼리키목록 + 바디키목록)
+            </div>
+          </div>
+
+          <div id="sec-exclude" class="s-section" style="display:none;">
+            <div class="s-title">제외 엔드포인트</div>
+            <div class="exclusion-list">
+              /api/auth/logout<br>
+              /api/payment/*<br>
+              POST:/api/user/delete<br>
+              DELETE:/api/admin/*
+            </div>
+            <div style="margin-top:6px;display:flex;gap:5px;">
+              <button class="btn primary">+ 추가</button>
+              <button class="btn">삭제</button>
+              <button class="btn">초기화</button>
+            </div>
+          </div>
+
+          <div id="sec-static" class="s-section" style="display:none;">
+            <div class="s-title">정적 자원 필터</div>
+            <div class="s-label" style="margin-bottom:6px;width:auto;">제외 확장자</div>
+            <div class="tag-list">
+              <span class="tag">.js <span class="x">×</span></span>
+              <span class="tag">.css <span class="x">×</span></span>
+              <span class="tag">.png <span class="x">×</span></span>
+              <span class="tag">.jpg <span class="x">×</span></span>
+              <span class="tag">.svg <span class="x">×</span></span>
+              <span class="tag">.ico <span class="x">×</span></span>
+              <span class="tag">.woff2 <span class="x">×</span></span>
+              <span class="tag">.map <span class="x">×</span></span>
+              <span class="tag">.mp4 <span class="x">×</span></span>
+              <span class="tag" style="background:#1a3a1a;border-color:#2a5a2a;color:#7af57a">+ 확장자 추가</span>
+            </div>
+            <div style="margin-top:8px;color:#e0c060;font-size:10px;">
+              ※ .pdf 는 인가 체크 대상 — 필터 제외
+            </div>
+            <div class="s-label" style="margin-top:10px;margin-bottom:6px;width:auto;">제외 경로 프리픽스</div>
+            <div class="tag-list">
+              <span class="tag">/static/ <span class="x">×</span></span>
+              <span class="tag">/assets/ <span class="x">×</span></span>
+              <span class="tag">/resources/ <span class="x">×</span></span>
+              <span class="tag">/_next/ <span class="x">×</span></span>
+              <span class="tag">/dist/ <span class="x">×</span></span>
+              <span class="tag" style="background:#1a3a1a;border-color:#2a5a2a;color:#7af57a">+ 경로 추가</span>
+            </div>
+          </div>
+
+          <div id="sec-compare" class="s-section" style="display:none;">
+            <div class="s-title">비교 설정</div>
+            <div class="s-row">
+              <span class="s-label">유사도 임계값 (SIMILAR 기준)</span>
+              <input class="s-input" value="80">
+              <span class="s-note">% (이 이상이면 SIMILAR 판정)</span>
+            </div>
+            <div class="s-row" style="margin-top:4px;color:var(--text-dim);font-size:10px;">
+              비교 대상: 응답 바디만 (헤더 제외 — Date, X-Request-Time 등 오염 방지)
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── RESULTS TAB ── -->
+      <div id="tab-results" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+
+        <!-- progress -->
+        <div class="progress-bar-wrap">
+          <div class="progress-top">
+            <div class="progress-label">
+              스캔 진행 중 — <span>279</span> / 450 요청 완료
+              &nbsp;|&nbsp; User A·B·C 동시 재전송 (총 <span>837</span> HTTP 요청)
+            </div>
+            <div class="progress-btns">
+              <button class="btn">일시정지</button>
+              <button class="btn">취소</button>
+            </div>
+          </div>
+          <div class="progress-track"><div class="progress-fill"></div></div>
+          <div class="progress-meta">
+            <span>완료: <b>279</b></span>
+            <span>오류: <b style="color:#f57a7a">3</b></span>
+            <span>예상 남은 시간: <b>~1분 12초</b></span>
+            <span>62%</span>
+          </div>
+        </div>
+
+        <!-- summary -->
+        <div class="summary-bar">
+          <div class="sum-item"><span class="label">총 요청</span><span class="val total">450</span></div>
+          <div class="sum-sep"></div>
+          <div class="sum-item"><span class="label">SAME</span><span class="val same" id="cnt-same">14</span></div>
+          <div class="sum-item"><span class="label">SIMILAR</span><span class="val similar" id="cnt-similar">31</span></div>
+          <div class="sum-item"><span class="label">DIFFERENCE</span><span class="val diff" id="cnt-diff">234</span></div>
+          <div class="sum-sep"></div>
+          <div class="sum-item"><span class="label" style="color:#888">미완료</span><span class="val" style="color:#888">171</span></div>
+          <div class="export-btn">
+            <button class="btn primary" onclick="alert('CSV 내보내기 (현재 279개 기준)')">CSV 내보내기</button>
+          </div>
+        </div>
+
+        <!-- profile pair selector -->
+        <div class="pair-bar">
+          <span class="pair-label">비교 프로필:</span>
+          <select class="pair-select" id="select-p1" onchange="onSelectChange()">
+            <option value="a" selected>A — User A (Victim)</option>
+            <option value="b">B — User B (Attacker)</option>
+            <option value="c">C — Admin</option>
+          </select>
+          <span class="pair-vs">↔</span>
+          <select class="pair-select" id="select-p2" onchange="onSelectChange()">
+            <option value="a">A — User A (Victim)</option>
+            <option value="b" selected>B — User B (Attacker)</option>
+            <option value="c">C — Admin</option>
+          </select>
+          <span class="pair-note" id="pair-note">A 요청을 기준으로 B 응답과 비교</span>
+        </div>
+
+        <!-- filter -->
+        <div class="filter-bar">
+          <button class="filter-btn active" onclick="setFilter(this,'all')" id="fbtn-all">전체</button>
+          <button class="filter-btn f-same"  onclick="setFilter(this,'same')" id="fbtn-same">SAME</button>
+          <button class="filter-btn f-sim"   onclick="setFilter(this,'similar')" id="fbtn-similar">SIMILAR</button>
+          <button class="filter-btn f-diff"  onclick="setFilter(this,'diff')" id="fbtn-diff">DIFFERENCE</button>
+          <input class="filter-search" placeholder="URL 검색..." oninput="filterTable(this.value)">
+        </div>
+
+        <!-- table -->
+        <div class="table-wrap">
+          <table class="results" id="resultsTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th class="col-method">Method</th>
+                <th>URL</th>
+                <th class="col-grp">그룹</th>
+                <th class="col-st1" id="th-st1"><span class="badge-user badge-a" style="font-size:9px;padding:1px 4px">A</span> 상태</th>
+                <th class="col-st2" id="th-st2"><span class="badge-user badge-b" style="font-size:9px;padding:1px 4px">B</span> 상태</th>
+                <th class="col-verdict">판정</th>
+                <th class="col-sim">유사도</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- detail panel -->
+        <div class="detail-wrap">
+          <div class="detail-tabs" id="detail-tabs">
+            <div class="d-tab active" id="dtab-p1" onclick="switchDetail(this,'d-p1')">
+              <span class="badge-user badge-a" style="font-size:9px;padding:1px 4px">A</span> User A
+            </div>
+            <div class="d-tab" id="dtab-p2" onclick="switchDetail(this,'d-p2')">
+              <span class="badge-user badge-b" style="font-size:9px;padding:1px 4px">B</span> User B
+            </div>
+            <div class="d-tab" onclick="switchDetail(this,'d-diff')">Diff 뷰</div>
+          </div>
+          <div class="detail-body" id="d-p1">
+<span class="kw">GET</span> <span class="str">/api/v2/user/1041/profile</span> HTTP/1.1
+Host: <span class="str">api.example.com</span>
+Cookie: <span class="str">session=aA1bB2cC3dD4eE5fF6; auth_token=eyJhbGciOiJIUzI1NiJ9...</span>
+Authorization: <span class="str">Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</span>
+
+<span style="color:#555">── Response ──────────────────────────</span>
+HTTP/1.1 <span class="num">200</span> OK
+Content-Type: application/json
+
+{
+  <span class="key">"id"</span>: <span class="num">1041</span>,
+  <span class="key">"username"</span>: <span class="str">"alice_corp"</span>,
+  <span class="key">"email"</span>: <span class="str">"alice@corp.internal"</span>,
+  <span class="key">"role"</span>: <span class="str">"user"</span>,
+  <span class="key">"dept"</span>: <span class="str">"Finance"</span>,
+  <span class="key">"employee_id"</span>: <span class="str">"EMP-0041"</span>
+}</div>
+          <div class="detail-body" id="d-p2" style="display:none;">
+<span class="kw">GET</span> <span class="str">/api/v2/user/1041/profile</span> HTTP/1.1
+Host: <span class="str">api.example.com</span>
+Cookie: <span class="str">session=xX9yY8zZ7wW6vV5uU4; auth_token=eyJhbGciOiJIUzI1NiJ9...</span>
+Authorization: <span class="str">Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp...</span>
+
+<span style="color:#555">── Response ──────────────────────────</span>
+HTTP/1.1 <span class="num">200</span> OK
+Content-Type: application/json
+
+{
+  <span class="key">"id"</span>: <span class="num">1041</span>,
+  <span class="key">"username"</span>: <span class="str">"alice_corp"</span>,
+  <span class="key">"email"</span>: <span class="str">"alice@corp.internal"</span>,
+  <span class="key">"role"</span>: <span class="str">"user"</span>,
+  <span class="key">"dept"</span>: <span class="str">"Finance"</span>,
+  <span class="key">"employee_id"</span>: <span class="str">"EMP-0041"</span>
+}</div>
+          <div class="detail-body" id="d-diff" style="display:none;">
+<span style="color:#555;font-size:10px">── Diff 뷰 (선택된 비교 쌍 기준) ──────────────</span>
+<div id="diff-content">
+<span class="diff-line-ctx"> {</span>
+<span class="diff-line-ctx">   "id": 1041,</span>
+<span class="diff-line-ctx">   "username": "alice_corp",</span>
+<span class="diff-line-ctx">   "email": "alice@corp.internal",</span>
+<span class="diff-line-ctx">   "role": "user",</span>
+<span class="diff-line-ctx">   "dept": "Finance",</span>
+<span class="diff-line-ctx">   "employee_id": "EMP-0041"</span>
+<span class="diff-line-ctx"> }</span>
+<span style="color:#f5c842;display:block;margin-top:6px;font-size:10px" id="diff-note">A-B SAME(100%) — User B가 User A(id:1041)의 데이터를 그대로 수신 → IDOR 의심</span>
+</div>
+</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="drilldown" id="drilldown">
+  <div class="dd-title">그룹핑된 요청 목록</div>
+  <div id="dd-content"></div>
+</div>
+
+<script>
+// ── Tab switching ──
+function switchTab(name) {
+  document.getElementById('tab-settings').style.display = name==='settings' ? 'flex' : 'none';
+  document.getElementById('tab-results').style.display  = name==='results'  ? 'flex' : 'none';
+  document.getElementById('btn-settings').classList.toggle('active', name==='settings');
+  document.getElementById('btn-results').classList.toggle('active',  name==='results');
+}
+
+function selectSection(el, sectionId) {
+  document.querySelectorAll('.settings-sidebar .s-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.s-section').forEach(s => s.style.display = 'none');
+  document.getElementById(sectionId).style.display = 'block';
+}
+
+function switchDetail(el, panelId) {
+  document.querySelectorAll('.d-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['d-p1','d-p2','d-diff'].forEach(id => {
+    document.getElementById(id).style.display = id===panelId ? 'block' : 'none';
+  });
+}
+
+// ── Data ──
+// Each row has simAB, simAC, simBC for all 3 pairs
+const ROWS = [
+  {id:1,  method:'GET',    url:'/api/v2/user/1041/profile',         host:'api.example.com', grp:3,  sa:200, sb:200, sc:200, simAB:100.0, simAC:100.0, simBC:100.0},
+  {id:2,  method:'GET',    url:'/api/v2/invoice/2024-INV-8842',     host:'api.example.com', grp:12, sa:200, sb:200, sc:200, simAB:100.0, simAC:100.0, simBC:100.0},
+  {id:3,  method:'GET',    url:'/api/v1/order/88421/detail',        host:'api.example.com', grp:7,  sa:200, sb:200, sc:200, simAB:98.2,  simAC:98.2,  simBC:99.1},
+  {id:4,  method:'POST',   url:'/api/v2/messages/send',             host:'api.example.com', grp:1,  sa:201, sb:201, sc:201, simAB:100.0, simAC:100.0, simBC:100.0},
+  {id:5,  method:'GET',    url:'/api/v1/admin/users/list',          host:'api.example.com', grp:1,  sa:200, sb:403, sc:200, simAB:4.1,   simAC:88.6,  simBC:3.8},
+  {id:6,  method:'GET',    url:'/api/v2/report/monthly?dept=fin',   host:'api.example.com', grp:4,  sa:200, sb:200, sc:200, simAB:87.3,  simAC:91.2,  simBC:89.4},
+  {id:7,  method:'GET',    url:'/api/v2/document/FIN-2024-0123.pdf',host:'api.example.com', grp:1,  sa:200, sb:403, sc:200, simAB:2.7,   simAC:82.4,  simBC:2.5},
+  {id:8,  method:'PUT',    url:'/api/v2/user/1041/settings',        host:'api.example.com', grp:1,  sa:200, sb:200, sc:200, simAB:91.0,  simAC:94.5,  simBC:92.3},
+  {id:9,  method:'GET',    url:'/api/v1/analytics/dashboard',       host:'api.example.com', grp:2,  sa:200, sb:200, sc:200, simAB:82.5,  simAC:95.1,  simBC:84.0},
+  {id:10, method:'DELETE', url:'/api/v2/comment/3317',              host:'api.example.com', grp:1,  sa:204, sb:403, sc:204, simAB:0.0,   simAC:0.0,   simBC:0.0},
+  {id:11, method:'GET',    url:'/api/v2/notification/inbox',        host:'api.example.com', grp:1,  sa:200, sb:200, sc:200, simAB:100.0, simAC:100.0, simBC:100.0},
+  {id:12, method:'GET',    url:'/api/v1/file/export?format=csv',    host:'api.example.com', grp:3,  sa:200, sb:403, sc:200, simAB:3.2,   simAC:86.7,  simBC:3.0},
+  {id:13, method:'POST',   url:'/api/v2/payment/checkout',          host:'api.example.com', grp:1,  sa:200, sb:200, sc:200, simAB:84.1,  simAC:89.0,  simBC:86.5},
+  {id:14, method:'GET',    url:'/api/v2/contract/CTR-2024-991',     host:'api.example.com', grp:5,  sa:200, sb:200, sc:200, simAB:100.0, simAC:100.0, simBC:100.0},
+  {id:15, method:'GET',    url:'/api/v1/config/app-settings',       host:'api.example.com', grp:1,  sa:200, sb:200, sc:403, simAB:22.8,  simAC:5.1,   simBC:4.9},
+];
+
+const GROUPED = {
+  1:  ['/api/v2/user/1041/profile','/api/v2/user/5872/profile','/api/v2/user/9901/profile'],
+  2:  ['/api/v2/invoice/2024-INV-8842','/api/v2/invoice/2024-INV-7731','/api/v2/invoice/2024-INV-6612',
+       '/api/v2/invoice/2023-INV-1190','/api/v2/invoice/2023-INV-0041','/api/v2/invoice/2023-INV-9932',
+       '/api/v2/invoice/2023-INV-8810','/api/v2/invoice/2023-INV-7620','/api/v2/invoice/2023-INV-5540',
+       '/api/v2/invoice/2023-INV-4420','/api/v2/invoice/2023-INV-3310','/api/v2/invoice/2023-INV-2201'],
+  3:  ['/api/v1/order/88421/detail','/api/v1/order/77310/detail','/api/v1/order/66209/detail',
+       '/api/v1/order/55108/detail','/api/v1/order/44007/detail','/api/v1/order/33906/detail','/api/v1/order/22805/detail'],
+  6:  ['/api/v2/report/monthly?dept=fin','/api/v2/report/monthly?dept=hr','/api/v2/report/monthly?dept=it','/api/v2/report/monthly?dept=ops'],
+  9:  ['/api/v1/analytics/dashboard','/api/v1/analytics/dashboard?period=weekly'],
+  12: ['/api/v1/file/export?format=csv','/api/v1/file/export?format=xlsx','/api/v1/file/export?format=json'],
+  14: ['/api/v2/contract/CTR-2024-991','/api/v2/contract/CTR-2024-883','/api/v2/contract/CTR-2024-775',
+       '/api/v2/contract/CTR-2023-660','/api/v2/contract/CTR-2023-551'],
+};
+
+const PROFILE_META = {
+  a: { badge:'badge-a', label:'A', name:'User A' },
+  b: { badge:'badge-b', label:'B', name:'User B' },
+  c: { badge:'badge-c', label:'C', name:'Admin'  },
+};
+
+const SIM_KEY = { a:{ a:null, b:'simAB', c:'simAC' }, b:{ a:'simAB', b:null, c:'simBC' }, c:{ a:'simAC', b:'simBC', c:null } };
+const ST_KEY  = { a:'sa', b:'sb', c:'sc' };
+
+let currentP1 = 'a';
+let currentP2 = 'b';
+let currentFilter = 'all';
+let searchVal = '';
+let selectedRow = 1;
+
+function getVerdict(sim) {
+  if (sim >= 99.9) return 'SAME';
+  if (sim >= 80)   return 'SIMILAR';
+  return 'DIFFERENCE';
+}
+
+function getSimColor(verdict) {
+  if (verdict === 'SAME')    return '#c0392b';
+  if (verdict === 'SIMILAR') return '#e67e22';
+  return '#27ae60';
+}
+
+function getProfileName(p) {
+  return PROFILE_META[p].name;
+}
+
+function onSelectChange() {
+  const p1 = document.getElementById('select-p1').value;
+  const p2 = document.getElementById('select-p2').value;
+  if (p1 === p2) {
+    // revert second dropdown to previous valid choice
+    const fallback = ['a','b','c'].find(p => p !== p1);
+    document.getElementById('select-p2').value = fallback;
+    currentP2 = fallback;
+  } else {
+    currentP2 = p2;
+  }
+  currentP1 = document.getElementById('select-p1').value;
+  applyPair();
+}
+
+function applyPair() {
+  const m1 = PROFILE_META[currentP1];
+  const m2 = PROFILE_META[currentP2];
+
+  document.getElementById('pair-note').textContent =
+    `${m1.name}(${m1.label}) 요청을 기준으로 ${m2.name}(${m2.label}) 응답과 비교`;
+
+  document.getElementById('th-st1').innerHTML =
+    `<span class="badge-user ${m1.badge}" style="font-size:9px;padding:1px 4px">${m1.label}</span> 상태`;
+  document.getElementById('th-st2').innerHTML =
+    `<span class="badge-user ${m2.badge}" style="font-size:9px;padding:1px 4px">${m2.label}</span> 상태`;
+
+  document.getElementById('dtab-p1').innerHTML =
+    `<span class="badge-user ${m1.badge}" style="font-size:9px;padding:1px 4px">${m1.label}</span> ${m1.name}`;
+  document.getElementById('dtab-p2').innerHTML =
+    `<span class="badge-user ${m2.badge}" style="font-size:9px;padding:1px 4px">${m2.label}</span> ${m2.name}`;
+
+  const selRow = ROWS.find(r => r.id === selectedRow);
+  if (selRow) {
+    const simKey = SIM_KEY[currentP1][currentP2];
+    const sim = simKey ? selRow[simKey] : 100;
+    const verdict = getVerdict(sim);
+    document.getElementById('diff-note').textContent =
+      `${m1.label}-${m2.label} ${verdict}(${sim.toFixed(0)}%) — 선택된 비교 쌍 결과`;
+  }
+
+  renderTable();
+  updateSummaryCounts();
+}
+
+function updateSummaryCounts() {
+  const simKey = SIM_KEY[currentP1][currentP2];
+  let same = 0, similar = 0, diff = 0;
+  ROWS.forEach(r => {
+    const sim = simKey ? r[simKey] : 100;
+    const v = getVerdict(sim);
+    if (v === 'SAME') same++;
+    else if (v === 'SIMILAR') similar++;
+    else diff++;
+  });
+  document.getElementById('cnt-same').textContent = same;
+  document.getElementById('cnt-similar').textContent = similar;
+  document.getElementById('cnt-diff').textContent = diff;
+  // update filter button labels
+  const total = ROWS.length;
+  document.getElementById('fbtn-all').textContent = '전체 ' + total;
+  document.getElementById('fbtn-same').textContent = 'SAME ' + same;
+  document.getElementById('fbtn-similar').textContent = 'SIMILAR ' + similar;
+  document.getElementById('fbtn-diff').textContent = 'DIFFERENCE ' + diff;
+}
+
+function setFilter(el, type) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  currentFilter = type;
+  renderTable();
+}
+
+function filterTable(val) {
+  searchVal = val.toLowerCase();
+  renderTable();
+}
+
+function renderTable() {
+  const simKey = SIM_KEY[currentP1][currentP2];
+  const m1 = PROFILE_META[currentP1];
+  const m2 = PROFILE_META[currentP2];
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+
+  ROWS.forEach(r => {
+    const sim = simKey ? r[simKey] : 100;
+    const verdict = getVerdict(sim);
+    const vLow = verdict.toLowerCase().replace('difference','diff');
+
+    if (currentFilter !== 'all' && vLow !== currentFilter) return;
+    if (searchVal && !r.url.toLowerCase().includes(searchVal) && !r.host.toLowerCase().includes(searchVal)) return;
+
+    const simColor = getSimColor(verdict);
+    const vClass = verdict === 'SAME' ? 'v-same' : verdict === 'SIMILAR' ? 'v-similar' : 'v-diff';
+    const mClass = r.method === 'GET' ? 'method-get' : r.method === 'POST' ? 'method-post' : r.method === 'PUT' ? 'method-put' : 'method-del';
+
+    const st1Val = r[ST_KEY[currentP1]];
+    const st2Val = r[ST_KEY[currentP2]];
+    const st1Class = st1Val < 300 ? 'status-ok' : st1Val < 400 ? 'status-rdr' : 'status-err';
+    const st2Class = st2Val < 300 ? 'status-ok' : st2Val < 400 ? 'status-rdr' : 'status-err';
+
+    const grpTxt = r.grp > 1
+      ? `<span class="grp-badge" onclick="showDrill(event,${r.id},${r.grp})">${r.grp}</span>`
+      : '<span style="color:#444">—</span>';
+
+    const simPct = Math.round(sim);
+    const simFill = `background:${simColor};width:${simPct}%`;
+
+    const badge1 = `<span class="badge-user ${m1.badge}" style="font-size:8px;padding:1px 3px">${m1.label}</span>`;
+    const badge2 = `<span class="badge-user ${m2.badge}" style="font-size:8px;padding:1px 3px">${m2.label}</span>`;
+
+    const tr = document.createElement('tr');
+    if (r.id === selectedRow) tr.classList.add('selected');
+    tr.dataset.id = r.id;
+    tr.innerHTML = `
+      <td style="color:var(--text-dim)">${r.id}</td>
+      <td><span class="method-badge ${mClass}">${r.method}</span></td>
+      <td class="url-cell"><span class="host">${r.host}</span><span class="path">${r.url}</span></td>
+      <td style="text-align:center">${grpTxt}</td>
+      <td style="text-align:center"><span class="${st1Class}">${st1Val}</span></td>
+      <td style="text-align:center"><span class="${st2Class}">${st2Val}</span></td>
+      <td><span class="verdict-badge ${vClass}">${verdict}</span></td>
+      <td>
+        <div class="sim-bar">
+          <span class="sim-val" style="color:${simColor};font-size:9px">${badge1}↔${badge2} ${simPct}%</span>
+          <div class="sim-track"><div class="sim-fill" style="${simFill}"></div></div>
+        </div>
+      </td>`;
+    tr.addEventListener('click', () => {
+      document.querySelectorAll('#tbody tr').forEach(t => t.classList.remove('selected'));
+      tr.classList.add('selected');
+      selectedRow = r.id;
+      const sk = SIM_KEY[currentP1][currentP2];
+      const s2 = sk ? r[sk] : 100;
+      const v2 = getVerdict(s2);
+      document.getElementById('diff-note').textContent =
+        `${m1.label}-${m2.label} ${v2}(${s2.toFixed(0)}%) — 선택된 비교 쌍 결과`;
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function showDrill(e, rowId, grp) {
+  e.stopPropagation();
+  const dd = document.getElementById('drilldown');
+  const allUrls = GROUPED[rowId] || [];
+  const rep = allUrls[0];
+  const rest = allUrls.slice(1);
+  let html = `<div class="dd-rep">대표 요청 (테스트됨)</div><div class="dd-item rep">▶ ${rep}</div>`;
+  if (rest.length) {
+    html += `<div class="dd-rep" style="margin-top:6px">묶인 요청 (제외됨)</div>`;
+    rest.forEach(u => { html += `<div class="dd-item">&nbsp;&nbsp;${u}</div>`; });
+  }
+  document.getElementById('dd-content').innerHTML = html;
+  dd.style.left = Math.min(e.pageX, window.innerWidth - 380) + 'px';
+  dd.style.top  = (e.pageY + 12) + 'px';
+  dd.classList.add('show');
+}
+
+document.addEventListener('click', () => {
+  document.getElementById('drilldown').classList.remove('show');
+});
+
+// init
+applyPair();
+</script>
+</body>
+</html>
