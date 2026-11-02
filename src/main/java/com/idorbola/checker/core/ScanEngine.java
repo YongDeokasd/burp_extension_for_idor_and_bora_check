@@ -130,6 +130,7 @@ public class ScanEngine {
             rateLimiter.acquire();
 
             HttpRequest modified = replacer.apply(group.getRepresentative(), profile);
+            result.putRequest(profile.getId(), modified);
             try {
                 HttpResponse response = api.http().sendRequest(modified).response();
                 result.putResponse(profile.getId(), response);

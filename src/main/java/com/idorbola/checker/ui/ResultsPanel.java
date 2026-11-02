@@ -48,8 +48,8 @@ public class ResultsPanel extends JPanel {
 
     // Detail panel
     private final JTabbedPane detailTabs;
-    private final JTextPane p1Detail;
-    private final JTextPane p2Detail;
+    private final MessageView p1Detail;
+    private final MessageView p2Detail;
     private final JTextPane diffDetail;
 
     // State
@@ -101,12 +101,12 @@ public class ResultsPanel extends JPanel {
         detailTabs = new JTabbedPane();
         detailTabs.setBackground(Theme.PANEL);
         detailTabs.setForeground(Theme.TEXT);
-        p1Detail   = detailPane();
-        p2Detail   = detailPane();
+        p1Detail   = new MessageView();
+        p2Detail   = new MessageView();
         diffDetail = detailPane();
-        detailTabs.addTab("P1 Response", Theme.scrollPane(p1Detail));
-        detailTabs.addTab("P2 Response", Theme.scrollPane(p2Detail));
-        detailTabs.addTab("Diff View",   Theme.scrollPane(diffDetail));
+        detailTabs.addTab("P1", p1Detail);
+        detailTabs.addTab("P2", p2Detail);
+        detailTabs.addTab("Diff View", Theme.scrollPane(diffDetail));
 
         buildUI();
         wireEvents();
@@ -424,8 +424,8 @@ public class ResultsPanel extends JPanel {
         int row = resultsTable.getSelectedRow();
         ScanResult result = row >= 0 ? tableModel.getResultAt(row) : null;
         if (result == null) {
-            p1Detail.setText("");
-            p2Detail.setText("");
+            p1Detail.setMessages("", "");
+            p2Detail.setMessages("", "");
             diffDetail.setText("");
             return;
         }
@@ -437,38 +437,20 @@ public class ResultsPanel extends JPanel {
         UserProfile p1 = profiles.get(i1);
         UserProfile p2 = profiles.get(i2);
 
-        p1Detail.setText(formatDetail(result, p1));
-        p2Detail.setText(formatDetail(result, p2));
+        p1Detail.setMessages(requestText(result, p1), responseText(result, p1));
+        p2Detail.setMessages(requestText(result, p2), responseText(result, p2));
         diffDetail.setText(buildDiff(result, p1, p2));
-
-        p1Detail.setCaretPosition(0);
-        p2Detail.setCaretPosition(0);
         diffDetail.setCaretPosition(0);
     }
 
-    private String formatDetail(ScanResult result, UserProfile profile) {
-        burp.api.montoya.http.message.requests.HttpRequest req =
-                result.getGroup().getRepresentative();
+    private static String requestText(ScanResult result, UserProfile profile) {
+        return result.getRequest(profile.getId()).toString();
+    }
+
+    private static String responseText(ScanResult result, UserProfile profile) {
         burp.api.montoya.http.message.responses.HttpResponse resp =
                 result.getResponses().get(profile.getId());
-
-        StringBuilder sb = new StringBuilder();
-        sb.append(req.method()).append(" ").append(req.path()).append(" HTTP/1.1\n");
-        sb.append("Host: ").append(req.httpService().host()).append("\n");
-        for (burp.api.montoya.http.message.HttpHeader h : req.headers()) {
-            sb.append(h.name()).append(": ").append(h.value()).append("\n");
-        }
-        sb.append("\n── Response ────────────────────────────────\n");
-        if (resp == null) {
-            sb.append("(no response)");
-        } else {
-            sb.append("HTTP/1.1 ").append(resp.statusCode()).append("\n");
-            for (burp.api.montoya.http.message.HttpHeader h : resp.headers()) {
-                sb.append(h.name()).append(": ").append(h.value()).append("\n");
-            }
-            sb.append("\n").append(resp.bodyToString());
-        }
-        return sb.toString();
+        return resp == null ? "(no response)" : resp.toString();
     }
 
     private String buildDiff(ScanResult result, UserProfile p1, UserProfile p2) {
@@ -584,6 +566,46 @@ public class ResultsPanel extends JPanel {
             btn.setForeground(selected ? Theme.TEXT_BRIGHT : Theme.TEXT_DIM);
         });
         return btn;
+    }
+
+    /** One profile's sent request and received response, with a Request/Response switch. */
+    private static final class MessageView extends JPanel {
+        private final JToggleButton requestBtn  = filterToggle("Request");
+        private final JToggleButton responseBtn = filterToggle("Response");
+        private final JTextPane text = detailPane();
+        private String request  = "";
+        private String response = "";
+
+        MessageView() {
+            super(new BorderLayout());
+            setBackground(Theme.PANEL);
+
+            ButtonGroup group = new ButtonGroup();
+            group.add(requestBtn);
+            group.add(responseBtn);
+            responseBtn.setSelected(true);
+            requestBtn.addActionListener(e -> refresh());
+            responseBtn.addActionListener(e -> refresh());
+
+            JPanel bar = Theme.panel(Theme.PANEL);
+            bar.setLayout(new FlowLayout(FlowLayout.LEFT, 6, 4));
+            bar.add(requestBtn);
+            bar.add(responseBtn);
+
+            add(bar, BorderLayout.NORTH);
+            add(Theme.scrollPane(text), BorderLayout.CENTER);
+        }
+
+        void setMessages(String request, String response) {
+            this.request = request;
+            this.response = response;
+            refresh();
+        }
+
+        private void refresh() {
+            text.setText(requestBtn.isSelected() ? request : response);
+            text.setCaretPosition(0);
+        }
     }
 
     private static JTextPane detailPane() {
