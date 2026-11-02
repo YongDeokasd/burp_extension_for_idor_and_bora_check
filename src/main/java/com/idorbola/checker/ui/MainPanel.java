@@ -64,7 +64,7 @@ public class MainPanel extends JPanel {
             }
 
             tabs.setSelectedIndex(1);
-            resultsPanel.updateProfiles(config.getProfiles());
+            resultsPanel.prepareScan(config);
 
             ScanEngine engine = new ScanEngine(api, config, new ScanEngine.ScanListener() {
                 @Override public void onResult(com.idorbola.checker.model.ScanResult r) {

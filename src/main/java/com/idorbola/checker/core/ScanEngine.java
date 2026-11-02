@@ -41,9 +41,12 @@ public class ScanEngine {
     public void startScan(List<HttpRequest> requests) {
         cancelled.set(false);
         paused.set(false);
-        executor = Executors.newFixedThreadPool(config.getThreadPoolSize());
+        executor = Executors.newFixedThreadPool(Math.max(1, config.getThreadPoolSize()));
 
-        executor.submit(() -> runScan(requests));
+        // Coordinator must not run inside the worker pool: it blocks on the workers' futures.
+        Thread coordinator = new Thread(() -> runScan(requests), "idor-bola-scan-coordinator");
+        coordinator.setDaemon(true);
+        coordinator.start();
     }
 
     private void runScan(List<HttpRequest> requests) {
