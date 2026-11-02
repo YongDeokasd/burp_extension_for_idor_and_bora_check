@@ -55,10 +55,11 @@ public class ResultsPanel extends JPanel {
     // State
     private ScanConfig scanConfig;
     private ScanEngine scanEngine;
+    private List<UserProfile> profiles = List.of();
+    private boolean suppressPairEvents = false;
     private final AtomicInteger doneCount   = new AtomicInteger(0);
     private final AtomicInteger errorCount  = new AtomicInteger(0);
     private final AtomicLong    scanStart   = new AtomicLong(0);
-    private int totalCount = 0;
 
     public ResultsPanel() {
         setLayout(new BorderLayout());
@@ -268,16 +269,13 @@ public class ResultsPanel extends JPanel {
     }
 
     private void onPairChanged() {
+        if (suppressPairEvents) return;
         int i1 = p1Combo.getSelectedIndex();
         int i2 = p2Combo.getSelectedIndex();
-        if (scanConfig == null || i1 < 0 || i2 < 0) return;
-        List<UserProfile> profiles = scanConfig.getProfiles();
-        if (i1 >= profiles.size() || i2 >= profiles.size()) return;
+        if (i1 < 0 || i2 < 0 || i1 >= profiles.size() || i2 >= profiles.size()) return;
 
-        // Prevent same selection
-        if (i1 == i2) {
-            int fallback = (i1 + 1) % profiles.size();
-            p2Combo.setSelectedIndex(fallback);
+        if (i1 == i2 && profiles.size() > 1) {
+            p2Combo.setSelectedIndex((i1 + 1) % profiles.size());
             return;
         }
 
@@ -294,15 +292,22 @@ public class ResultsPanel extends JPanel {
 
         updateSummary();
         updateFilterCounts();
+        updateDetailPanel();
     }
 
     // ── Public API ───────────────────────────────────────────────────────────
 
-    public void updateProfiles(List<UserProfile> profiles) {
-        SwingUtilities.invokeLater(() -> {
-            String sel1 = (String) p1Combo.getSelectedItem();
-            String sel2 = (String) p2Combo.getSelectedItem();
+    public void updateProfiles(List<UserProfile> newProfiles) {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(() -> updateProfiles(newProfiles));
+            return;
+        }
+        int prev1 = p1Combo.getSelectedIndex();
+        int prev2 = p2Combo.getSelectedIndex();
+        profiles = List.copyOf(newProfiles);
 
+        suppressPairEvents = true;
+        try {
             p1Combo.removeAllItems();
             p2Combo.removeAllItems();
             for (UserProfile p : profiles) {
@@ -311,61 +316,33 @@ public class ResultsPanel extends JPanel {
                 p2Combo.addItem(label);
             }
             if (!profiles.isEmpty()) {
-                p1Combo.setSelectedIndex(0);
-                p2Combo.setSelectedIndex(Math.min(1, profiles.size() - 1));
+                int n = profiles.size();
+                int i1 = prev1 >= 0 && prev1 < n ? prev1 : 0;
+                int i2 = prev2 >= 0 && prev2 < n && prev2 != i1 ? prev2 : (n > 1 ? (i1 + 1) % n : 0);
+                p1Combo.setSelectedIndex(i1);
+                p2Combo.setSelectedIndex(i2);
             }
-        });
+        } finally {
+            suppressPairEvents = false;
+        }
+        onPairChanged();
     }
 
-    public void startScan(List<burp.api.montoya.http.message.requests.HttpRequest> requests, ScanConfig config) {
+    /** Must be called on the EDT before the scan engine starts emitting events. */
+    public void prepareScan(ScanConfig config) {
         this.scanConfig = config;
-        SwingUtilities.invokeLater(() -> {
-            tableModel.clearResults();
-            tableModel.setThreshold(config.getSimilarityThreshold());
-            doneCount.set(0);
-            errorCount.set(0);
-            scanStart.set(System.currentTimeMillis());
-            totalCount = requests.size();
-            progressBar.setValue(0);
-            progressLabel.setText("Preparing scan…");
-            pauseButton.setText("Pause");
-            updateProfiles(config.getProfiles());
-        });
-
-        scanEngine = new ScanEngine(null /* api passed at top level */, config, new ScanEngine.ScanListener() {
-            @Override public void onResult(ScanResult result) {
-                SwingUtilities.invokeLater(() -> {
-                    tableModel.addResult(result);
-                    updateSummary();
-                });
-            }
-            @Override public void onProgress(int done, int total) {
-                doneCount.set(done);
-                SwingUtilities.invokeLater(() -> {
-                    int pct = total > 0 ? (done * 100 / total) : 0;
-                    progressBar.setValue(pct);
-                    progressLabel.setText("Scanning — " + done + " / " + total + " requests"
-                            + "  |  " + config.getProfiles().size() + " profiles simultaneous"
-                            + " (total " + (total * config.getProfiles().size()) + " HTTP requests)");
-                    long elapsed = System.currentTimeMillis() - scanStart.get();
-                    long eta = done > 0 ? (elapsed * (total - done) / done) : 0;
-                    metaLabel.setText("Done: " + done + "  |  Errors: " + errorCount.get()
-                            + "  |  ETA: ~" + formatEta(eta) + "  |  " + pct + "%");
-                });
-            }
-            @Override public void onComplete() {
-                SwingUtilities.invokeLater(() -> {
-                    progressBar.setValue(100);
-                    progressLabel.setText("Scan complete — " + doneCount.get() + " requests processed.");
-                    updateSummary();
-                });
-            }
-            @Override public void onError(String msg) {
-                errorCount.incrementAndGet();
-                SwingUtilities.invokeLater(() ->
-                        metaLabel.setText("Errors: " + errorCount.get() + " — last: " + msg));
-            }
-        });
+        tableModel.clearResults();
+        tableModel.setThreshold(config.getSimilarityThreshold());
+        doneCount.set(0);
+        errorCount.set(0);
+        scanStart.set(System.currentTimeMillis());
+        progressBar.setValue(0);
+        progressLabel.setText("Preparing scan…");
+        metaLabel.setText("");
+        pauseButton.setText("Pause");
+        updateProfiles(config.getProfiles());
+        updateSummary();
+        updateFilterCounts();
     }
 
     /** Called by MainPanel after constructing ScanEngine with the real MontoyaApi. */
@@ -455,8 +432,6 @@ public class ResultsPanel extends JPanel {
 
         int i1 = p1Combo.getSelectedIndex();
         int i2 = p2Combo.getSelectedIndex();
-        if (scanConfig == null) return;
-        List<UserProfile> profiles = scanConfig.getProfiles();
         if (i1 < 0 || i1 >= profiles.size() || i2 < 0 || i2 >= profiles.size()) return;
 
         UserProfile p1 = profiles.get(i1);
@@ -546,9 +521,7 @@ public class ResultsPanel extends JPanel {
         if (scanConfig == null) return;
         int i1 = p1Combo.getSelectedIndex();
         int i2 = p2Combo.getSelectedIndex();
-        if (i1 < 0 || i2 < 0) return;
-        List<UserProfile> profiles = scanConfig.getProfiles();
-        if (i1 >= profiles.size() || i2 >= profiles.size()) return;
+        if (i1 < 0 || i2 < 0 || i1 >= profiles.size() || i2 >= profiles.size()) return;
 
         CsvExporter.exportToFile(this,
                 tableModel,

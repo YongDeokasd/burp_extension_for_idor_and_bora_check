@@ -65,7 +65,9 @@ public class ResultTableModel extends AbstractTableModel {
     }
 
     public void addResult(ScanResult result) {
-        allResults.add(result);
+        int pos = 0;
+        while (pos < allResults.size() && allResults.get(pos).getRowIndex() < result.getRowIndex()) pos++;
+        allResults.add(pos, result);
         applyFilter();
     }
 
