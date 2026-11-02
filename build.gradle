@@ -25,7 +25,7 @@ shadowJar {
     archiveClassifier.set('')
     archiveFileName.set("idor-bola-checker-${version}.jar")
     manifest {
-        attributes 'Burp-Extension-Class': 'com.idorbola.checker.BurpExtension'
+        attributes 'Burp-Extension-Class': 'com.idorbola.checker.IdorBolaExtension'
     }
 }
 
