@@ -17,6 +17,15 @@ public class IdorBolaExtension implements BurpExtension {
         api.userInterface().registerContextMenuItemsProvider(
                 new SitemapContextMenu(api, mainPanel));
 
+        try {
+            HistoryHotKey.register(api, mainPanel);
+        } catch (LinkageError e) {
+            api.logging().logToOutput("Proxy history hotkey needs Burp Suite with Montoya API 2025.12 or later; "
+                    + "use right-click > IDOR/BOLA Checker instead.");
+        } catch (RuntimeException e) {
+            api.logging().logToError("Proxy history hotkey registration failed: " + e.getMessage());
+        }
+
         api.logging().logToOutput("IDOR/BOLA Checker loaded.");
     }
 }

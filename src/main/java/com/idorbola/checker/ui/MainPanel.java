@@ -26,7 +26,7 @@ public class MainPanel extends JPanel {
         setBackground(Theme.BG);
 
         settingsPanel = new SettingsPanel();
-        resultsPanel  = new ResultsPanel();
+        resultsPanel  = new ResultsPanel(api);
 
         tabs = new JTabbedPane();
         tabs.setBackground(Theme.PANEL);
