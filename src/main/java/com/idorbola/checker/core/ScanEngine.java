@@ -4,6 +4,7 @@ import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.responses.HttpResponse;
 import com.idorbola.checker.model.*;
+import com.idorbola.checker.util.HttpText;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -77,7 +78,7 @@ public class ScanEngine {
             // 2. Deduplicate within this batch and against endpoints already in the results table
             List<RequestGroup> groups = new ArrayList<>();
             if (config.isDeduplicationEnabled()) {
-                for (RequestGroup g : deduplicator.deduplicate(filtered)) {
+                for (RequestGroup g : deduplicator.deduplicate(filtered, config.getDedupLevel())) {
                     if (context.scannedFingerprints().add(g.getFingerprint())) {
                         groups.add(g);
                     } else {
@@ -86,7 +87,7 @@ public class ScanEngine {
                 }
             } else {
                 for (HttpRequest req : filtered) {
-                    groups.add(new RequestGroup(req, RequestDeduplicator.fingerprint(req)));
+                    groups.add(new RequestGroup(req, RequestDeduplicator.fingerprint(req, DedupLevel.OFF)));
                 }
             }
 
@@ -180,8 +181,8 @@ public class ScanEngine {
                 HttpResponse r2 = result.getResponses().get(p2.getId());
                 if (r1 == null || r2 == null) continue;
 
-                String body1 = r1.bodyToString();
-                String body2 = r2.bodyToString();
+                String body1 = HttpText.body(r1);
+                String body2 = HttpText.body(r2);
                 String ct    = r1.headerValue("Content-Type");
 
                 float sim = comparator.compare(body1, body2, ct);

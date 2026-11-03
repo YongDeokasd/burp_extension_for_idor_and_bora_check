@@ -8,8 +8,10 @@ import javax.swing.*;
 import java.awt.*;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class CsvExporter {
@@ -20,7 +22,8 @@ public class CsvExporter {
                               String p1Id,
                               String p2Id,
                               int threshold) throws IOException {
-        try (BufferedWriter w = new BufferedWriter(new FileWriter(file))) {
+        try (BufferedWriter w = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8))) {
+            w.write('﻿'); // BOM so Excel opens Korean text as UTF-8
             // Header
             StringBuilder header = new StringBuilder("#,Method,URL,Group,Fingerprint");
             for (UserProfile p : profiles) {
@@ -72,9 +75,9 @@ public class CsvExporter {
             var svc = req.httpService();
             return (svc.secure() ? "https" : "http") + "://" + svc.host()
                     + (svc.port() == 80 || svc.port() == 443 ? "" : ":" + svc.port())
-                    + req.path();
+                    + HttpText.displayPath(req.path());
         } catch (Exception e) {
-            return r.getGroup().getRepresentative().path();
+            return HttpText.displayPath(r.getGroup().getRepresentative().path());
         }
     }
 
@@ -83,6 +86,7 @@ public class CsvExporter {
      */
     public static void exportToFile(Component parent,
                                     com.idorbola.checker.ui.ResultTableModel model,
+                                    List<UserProfile> profiles,
                                     String p1Id, String p2Id, int threshold) {
         JFileChooser chooser = new JFileChooser();
         chooser.setDialogTitle("Export Results as CSV");
@@ -94,17 +98,6 @@ public class CsvExporter {
         for (int i = 0; i < model.getRowCount(); i++) {
             ScanResult r = model.getResultAt(i);
             if (r != null) rows.add(r);
-        }
-
-        // Derive full profile list from the model results
-        List<UserProfile> profiles = new java.util.ArrayList<>();
-        if (!rows.isEmpty()) {
-            rows.get(0).getResponses().keySet().forEach(id -> {
-                UserProfile p = new UserProfile();
-                p.setId(id);
-                p.setLabel(id.substring(0, Math.min(1, id.length())).toUpperCase());
-                profiles.add(p);
-            });
         }
 
         try {

@@ -2,6 +2,7 @@ package com.idorbola.checker.ui;
 
 import com.idorbola.checker.model.ScanResult;
 import com.idorbola.checker.model.Verdict;
+import com.idorbola.checker.util.HttpText;
 
 import javax.swing.table.AbstractTableModel;
 import java.util.ArrayList;
@@ -54,7 +55,7 @@ public class ResultTableModel extends AbstractTableModel {
         return switch (col) {
             case 0 -> r.getRowIndex() + 1;
             case 1 -> r.getGroup().getRepresentative().method();
-            case 2 -> r.getGroup().getRepresentative().path();
+            case 2 -> HttpText.displayPath(r.getGroup().getRepresentative().path());
             case 3 -> r.getGroup().size() > 1 ? r.getGroup().size() : null;
             case 4 -> p1Id != null ? r.getStatus(p1Id) : -1;
             case 5 -> p2Id != null ? r.getStatus(p2Id) : -1;
@@ -160,10 +161,12 @@ public class ResultTableModel extends AbstractTableModel {
 
     private boolean matchesSearch(ScanResult r) {
         if (searchQuery.isEmpty()) return true;
-        String url = r.getGroup().getRepresentative().path().toLowerCase();
+        String rawPath = r.getGroup().getRepresentative().path();
+        String url = rawPath.toLowerCase();
+        String decoded = HttpText.displayPath(rawPath).toLowerCase();
         String host = "";
         try { host = r.getGroup().getRepresentative().httpService().host().toLowerCase(); } catch (Exception ignored) {}
-        return url.contains(searchQuery) || host.contains(searchQuery);
+        return url.contains(searchQuery) || decoded.contains(searchQuery) || host.contains(searchQuery);
     }
 
     private boolean matchesVerdictFilter(ScanResult r) {

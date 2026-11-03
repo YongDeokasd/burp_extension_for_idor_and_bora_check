@@ -9,7 +9,7 @@ import java.util.Set;
 public class ScanConfig {
 
     private List<UserProfile> profiles = new ArrayList<>();
-    private boolean deduplicationEnabled = true;
+    private DedupLevel dedupLevel = DedupLevel.MEDIUM;
     private int threadPoolSize = 10;
     private int rateLimitPerSecond = 20;
     private int profileDelayMs = 0;
@@ -88,10 +88,10 @@ public class ScanConfig {
         }
     }
 
-    public boolean isDeduplicationEnabled() { return deduplicationEnabled; }
-    public void setDeduplicationEnabled(boolean deduplicationEnabled) {
-        this.deduplicationEnabled = deduplicationEnabled;
-    }
+    public DedupLevel getDedupLevel() { return dedupLevel != null ? dedupLevel : DedupLevel.MEDIUM; }
+    public void setDedupLevel(DedupLevel dedupLevel) { this.dedupLevel = dedupLevel; }
+
+    public boolean isDeduplicationEnabled() { return getDedupLevel() != DedupLevel.OFF; }
 
     public int getThreadPoolSize() { return threadPoolSize; }
     public void setThreadPoolSize(int threadPoolSize) { this.threadPoolSize = Math.max(1, threadPoolSize); }

@@ -63,6 +63,7 @@ public class MainPanel extends JPanel {
                 return;
             }
 
+            saveConfig();
             tabs.setSelectedIndex(1);
             resultsPanel.prepareScan(config);
 

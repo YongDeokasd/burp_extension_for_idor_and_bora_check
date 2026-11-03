@@ -5,6 +5,7 @@ import burp.api.montoya.http.message.requests.HttpRequest;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.idorbola.checker.model.DedupLevel;
 import com.idorbola.checker.model.RequestGroup;
 
 import java.net.URLDecoder;
@@ -16,10 +17,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Groups requests that hit the same endpoint "shape" so only one representative is replayed.
- *
- * Fingerprint = SHA256(METHOD | origin | normalized path | query keys | body kind | body keys)
- * Normalization is used only for the fingerprint; the original request is replayed unchanged.
+ * Groups requests so only one representative per group is replayed. What counts as "the same"
+ * depends on the {@link DedupLevel}. Normalization is used only for the fingerprint; the original
+ * request is replayed unchanged.
  */
 public class RequestDeduplicator {
 
@@ -32,10 +32,10 @@ public class RequestDeduplicator {
     private static final Pattern MULTIPART_NAME = Pattern.compile("name=\"([^\"]*)\"");
     private static final Pattern GRAPHQL_OP  = Pattern.compile("\\b(query|mutation|subscription)\\s+(\\w+)");
 
-    public List<RequestGroup> deduplicate(List<HttpRequest> requests) {
+    public List<RequestGroup> deduplicate(List<HttpRequest> requests, DedupLevel level) {
         Map<String, RequestGroup> seen = new LinkedHashMap<>();
         for (HttpRequest req : requests) {
-            String fp = fingerprint(req);
+            String fp = fingerprint(req, level);
             RequestGroup group = seen.get(fp);
             if (group == null) {
                 seen.put(fp, new RequestGroup(req, fp));
@@ -46,40 +46,53 @@ public class RequestDeduplicator {
         return new ArrayList<>(seen.values());
     }
 
-    public static String fingerprint(HttpRequest req) {
-        String path = req.path() == null ? "/" : req.path();
-        int fragment = path.indexOf('#');
-        if (fragment >= 0) path = path.substring(0, fragment);
-        String query = "";
-        int qIdx = path.indexOf('?');
-        if (qIdx >= 0) {
-            query = path.substring(qIdx + 1);
-            path  = path.substring(0, qIdx);
+    /** OFF uses the LOW (exact URL) fingerprint so each request still has a stable identity. */
+    public static String fingerprint(HttpRequest req, DedupLevel level) {
+        String method = req.method().toUpperCase(Locale.ROOT);
+        String origin = origin(req.httpService());
+        String fullPath = req.path() == null ? "/" : req.path();
+        int fragment = fullPath.indexOf('#');
+        if (fragment >= 0) fullPath = fullPath.substring(0, fragment);
+
+        if (level == DedupLevel.OFF || level == DedupLevel.LOW) {
+            return sha256(method + "\n" + origin + "\n" + fullPath);
         }
 
+        String path  = fullPath;
+        String query = "";
+        int qIdx = fullPath.indexOf('?');
+        if (qIdx >= 0) {
+            query = fullPath.substring(qIdx + 1);
+            path  = fullPath.substring(0, qIdx);
+        }
         BodyShape body = bodyShape(req);
-        String raw = req.method().toUpperCase(Locale.ROOT)
-                + "\n" + origin(req.httpService())
-                + "\n" + normalizePath(path)
+
+        if (level == DedupLevel.HIGH) {
+            String graphql = String.join(",", body.keys.stream().filter(k -> k.startsWith("graphql:")).toList());
+            return sha256(method + "\n" + origin + "\n" + normalizePath(path, true) + "\n" + graphql);
+        }
+
+        return sha256(method
+                + "\n" + origin
+                + "\n" + normalizePath(path, false)
                 + "\n" + String.join(",", formKeys(query))
                 + "\n" + body.kind
-                + "\n" + String.join(",", body.keys);
-        return sha256(raw);
+                + "\n" + String.join(",", body.keys));
     }
 
     // ── Path ────────────────────────────────────────────────────────────────
 
-    static String normalizePath(String path) {
+    static String normalizePath(String path, boolean loose) {
         if (path == null || path.isEmpty()) return "/";
         StringBuilder sb = new StringBuilder();
         for (String seg : path.split("/")) {
             if (seg.isEmpty()) continue;
-            sb.append('/').append(normalizeSegment(decode(seg)));
+            sb.append('/').append(normalizeSegment(decode(seg), loose));
         }
         return sb.length() == 0 ? "/" : sb.toString().toLowerCase(Locale.ROOT);
     }
 
-    private static String normalizeSegment(String seg) {
+    private static String normalizeSegment(String seg, boolean loose) {
         String name = seg;
         String ext  = "";
         Matcher m = EXTENSION.matcher(seg);
@@ -87,11 +100,14 @@ public class RequestDeduplicator {
             name = m.group(1);
             ext  = m.group(2);
         }
-        return isIdSegment(name) ? "{id}" + ext : seg;
+        return isIdSegment(name, loose) ? "{id}" + ext : seg;
     }
 
-    /** Heuristic: does this path segment look like an object identifier rather than a route name? */
-    static boolean isIdSegment(String seg) {
+    /**
+     * Heuristic: does this path segment look like an object identifier rather than a route name?
+     * loose (HIGH level): any segment with a digit counts, except API versions such as v2.
+     */
+    static boolean isIdSegment(String seg, boolean loose) {
         if (seg.isEmpty()) return false;
         if (seg.indexOf('@') > 0) return true;
         if (VERSION_SEG.matcher(seg).matches()) return false;
@@ -100,6 +116,7 @@ public class RequestDeduplicator {
         for (int i = 0; i < seg.length(); i++) {
             if (Character.isDigit(seg.charAt(i))) digits++;
         }
+        if (loose && digits > 0) return true;
         if (digits == seg.length()) return true;
         if (UUID_SEG.matcher(seg).matches()) return true;
         if (digits > 0 && HEX_SEG.matcher(seg).matches()) return true;

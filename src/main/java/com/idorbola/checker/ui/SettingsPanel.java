@@ -1,5 +1,6 @@
 package com.idorbola.checker.ui;
 
+import com.idorbola.checker.model.DedupLevel;
 import com.idorbola.checker.model.ScanConfig;
 import com.idorbola.checker.model.UserProfile;
 
@@ -25,7 +26,7 @@ public class SettingsPanel extends JPanel {
     private final JSpinner timeoutSpinner;
 
     // Dedup
-    private final JToggleButton dedupToggle;
+    private final Map<DedupLevel, JRadioButton> dedupButtons = new EnumMap<>(DedupLevel.class);
 
     // Exclusion patterns
     private final JTextArea exclusionArea;
@@ -70,15 +71,18 @@ public class SettingsPanel extends JPanel {
         profileTable.getColumnModel().getColumn(0).setMaxWidth(50);
         profileTable.getColumnModel().getColumn(3).setMaxWidth(80);
 
-        // Dedup toggle
-        dedupToggle = new JToggleButton("ON");
-        dedupToggle.setSelected(true);
-        dedupToggle.setBackground(Theme.ACCENT_DIM);
-        dedupToggle.setForeground(Theme.TEXT_BRIGHT);
-        dedupToggle.setFont(Theme.UI_SMALL);
-        dedupToggle.setBorder(new LineBorder(Theme.ACCENT, 1));
-        dedupToggle.setFocusPainted(false);
-        dedupToggle.addActionListener(e -> dedupToggle.setText(dedupToggle.isSelected() ? "ON" : "OFF"));
+        // Dedup level radio buttons
+        ButtonGroup dedupGroup = new ButtonGroup();
+        for (DedupLevel level : DedupLevel.values()) {
+            JRadioButton rb = new JRadioButton(level.getLabel());
+            rb.setBackground(Theme.PANEL);
+            rb.setForeground(Theme.TEXT);
+            rb.setFont(Theme.UI_BOLD);
+            rb.setFocusPainted(false);
+            dedupGroup.add(rb);
+            dedupButtons.put(level, rb);
+        }
+        dedupButtons.get(DedupLevel.MEDIUM).setSelected(true);
 
         // Exclusion text area
         exclusionArea = Theme.textArea();
@@ -240,16 +244,21 @@ public class SettingsPanel extends JPanel {
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
         form.setBorder(new EmptyBorder(10, 12, 10, 12));
 
-        JPanel row = Theme.panel(Theme.PANEL);
-        row.setLayout(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        row.add(Theme.label("Deduplication:"));
-        row.add(dedupToggle);
-        form.add(row);
-        form.add(Box.createVerticalStrut(8));
+        JLabel intro = Theme.dimLabel("<html><div style='width:600px'>Choose how aggressively duplicate requests are merged before replay. "
+                + "Only one request per group is replayed; the Group column shows how many were merged.</div></html>");
+        intro.setAlignmentX(LEFT_ALIGNMENT);
+        form.add(intro);
+        form.add(Box.createVerticalStrut(10));
 
-        JLabel desc = Theme.dimLabel("<html>Fingerprint = SHA256(Method + NormalizedPath + QueryKeys + BodyKeys)<br>"
-                + "When OFF, all URLs are tested individually.</html>");
-        form.add(desc);
+        for (DedupLevel level : DedupLevel.values()) {
+            JRadioButton rb = dedupButtons.get(level);
+            rb.setAlignmentX(LEFT_ALIGNMENT);
+            form.add(rb);
+            JLabel desc = Theme.dimLabel("<html><div style='width:520px'>" + level.getDescription() + "</div></html>");
+            desc.setBorder(new EmptyBorder(0, 26, 10, 0));
+            desc.setAlignmentX(LEFT_ALIGNMENT);
+            form.add(desc);
+        }
 
         p.add(form, BorderLayout.NORTH);
         return p;
@@ -457,7 +466,7 @@ public class SettingsPanel extends JPanel {
     public ScanConfig getConfig() {
         ScanConfig cfg = new ScanConfig();
         cfg.setProfiles(new ArrayList<>(profiles));
-        cfg.setDeduplicationEnabled(dedupToggle.isSelected());
+        dedupButtons.forEach((level, rb) -> { if (rb.isSelected()) cfg.setDedupLevel(level); });
         cfg.setThreadPoolSize((Integer) threadPoolSpinner.getValue());
         cfg.setRateLimitPerSecond((Integer) rateLimitSpinner.getValue());
         cfg.setProfileDelayMs((Integer) profileDelaySpinner.getValue());
@@ -479,8 +488,7 @@ public class SettingsPanel extends JPanel {
         profiles.addAll(config.getProfiles());
         refreshProfileTable();
 
-        dedupToggle.setSelected(config.isDeduplicationEnabled());
-        dedupToggle.setText(config.isDeduplicationEnabled() ? "ON" : "OFF");
+        dedupButtons.get(config.getDedupLevel()).setSelected(true);
         threadPoolSpinner.setValue(config.getThreadPoolSize());
         rateLimitSpinner.setValue(config.getRateLimitPerSecond());
         profileDelaySpinner.setValue(config.getProfileDelayMs());

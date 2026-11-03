@@ -3,6 +3,7 @@ package com.idorbola.checker.ui;
 import com.idorbola.checker.core.ScanEngine;
 import com.idorbola.checker.model.*;
 import com.idorbola.checker.util.CsvExporter;
+import com.idorbola.checker.util.HttpText;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -566,13 +567,13 @@ public class ResultsPanel extends JPanel {
     }
 
     private static String requestText(ScanResult result, UserProfile profile) {
-        return result.getRequest(profile.getId()).toString();
+        return HttpText.message(result.getRequest(profile.getId()));
     }
 
     private static String responseText(ScanResult result, UserProfile profile) {
         burp.api.montoya.http.message.responses.HttpResponse resp =
                 result.getResponses().get(profile.getId());
-        return resp == null ? "(no response)" : resp.toString();
+        return resp == null ? "(no response)" : HttpText.message(resp);
     }
 
     private String buildDiff(ScanResult result, UserProfile p1, UserProfile p2) {
@@ -580,8 +581,8 @@ public class ResultsPanel extends JPanel {
         burp.api.montoya.http.message.responses.HttpResponse r2 = result.getResponses().get(p2.getId());
         if (r1 == null || r2 == null) return "(responses not available)";
 
-        String[] linesA = r1.bodyToString().split("\n", -1);
-        String[] linesB = r2.bodyToString().split("\n", -1);
+        String[] linesA = HttpText.body(r1).split("\n", -1);
+        String[] linesB = HttpText.body(r2).split("\n", -1);
 
         Float sim = result.getSimilarity(p1.getId(), p2.getId());
         String header = "--- " + p1.getLabel() + " — " + p1.getName() + "\n"
@@ -629,6 +630,7 @@ public class ResultsPanel extends JPanel {
 
         CsvExporter.exportToFile(this,
                 tableModel,
+                profiles,
                 profiles.get(i1).getId(),
                 profiles.get(i2).getId(),
                 scanConfig.getSimilarityThreshold());
