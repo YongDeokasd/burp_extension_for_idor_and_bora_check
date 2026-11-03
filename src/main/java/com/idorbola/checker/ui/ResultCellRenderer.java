@@ -44,15 +44,15 @@ public class ResultCellRenderer extends DefaultTableCellRenderer {
 
     private void renderMethod(Object value) {
         String method = value != null ? value.toString() : "";
-        setFont(new Font(Font.MONOSPACED, Font.BOLD, 10));
+        setFont(Theme.MONO_BOLD);
         setHorizontalAlignment(CENTER);
         Color bg, fg;
         switch (method) {
-            case "GET"    -> { bg = new Color(0x1a3a5c); fg = new Color(0x7ab8f5); }
-            case "POST"   -> { bg = new Color(0x2a3a1a); fg = new Color(0xa8d878); }
-            case "PUT"    -> { bg = new Color(0x3a2a1a); fg = new Color(0xf5c07a); }
-            case "DELETE" -> { bg = new Color(0x3a1a1a); fg = new Color(0xf57a7a); }
-            default       -> { bg = new Color(0x2a2a3a); fg = new Color(0xd4d4d4); }
+            case "GET"    -> { bg = new Color(0xe3f0fc); fg = new Color(0x1a5fa8); }
+            case "POST"   -> { bg = new Color(0xe8f5e0); fg = new Color(0x3d7a1a); }
+            case "PUT", "PATCH" -> { bg = new Color(0xfdf0e0); fg = new Color(0xa8650f); }
+            case "DELETE" -> { bg = new Color(0xfde8e8); fg = new Color(0xb03030); }
+            default       -> { bg = Theme.CHIP_BG; fg = Theme.TEXT; }
         }
         setBackground(bg);
         setForeground(fg);
@@ -71,15 +71,15 @@ public class ResultCellRenderer extends DefaultTableCellRenderer {
     private void renderGroup(Object value) {
         setHorizontalAlignment(CENTER);
         if (value == null) {
-            setForeground(new Color(0x444444));
+            setForeground(Theme.TEXT_MUTED);
             setText("—");
         } else {
             int size = (Integer) value;
             if (size > 1) {
-                setForeground(new Color(0x8a8aff));
+                setForeground(Theme.GROUP);
                 setText(String.valueOf(size));
             } else {
-                setForeground(new Color(0x444444));
+                setForeground(Theme.TEXT_MUTED);
                 setText("—");
             }
         }
@@ -103,7 +103,7 @@ public class ResultCellRenderer extends DefaultTableCellRenderer {
         if (value instanceof Verdict v) {
             setForeground(Theme.verdictColor(v));
             if (!isSelected) setBackground(Theme.verdictBg(v));
-            setFont(new Font(Font.SANS_SERIF, Font.BOLD, 10));
+            setFont(Theme.BADGE);
             setText(v.name());
         } else {
             setForeground(Theme.TEXT_DIM);
@@ -113,7 +113,7 @@ public class ResultCellRenderer extends DefaultTableCellRenderer {
 
     private void renderSimilarity(JTable table, Object value, int row, boolean isSelected) {
         setHorizontalAlignment(RIGHT);
-        setFont(new Font(Font.MONOSPACED, Font.PLAIN, 10));
+        setFont(Theme.MONO_SMALL);
         if (value instanceof Float f) {
             float pct = f * 100f;
             Verdict v = model.getResultAt(row) != null

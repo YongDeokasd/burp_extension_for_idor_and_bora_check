@@ -1,6 +1,10 @@
 package com.idorbola.checker.core;
 
+import burp.api.montoya.http.HttpService;
 import burp.api.montoya.http.message.requests.HttpRequest;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.idorbola.checker.model.RequestGroup;
 
 import java.net.URLDecoder;
@@ -8,26 +12,33 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Groups requests that hit the same endpoint "shape" so only one representative is replayed.
+ *
+ * Fingerprint = SHA256(METHOD | origin | normalized path | query keys | body kind | body keys)
+ * Normalization is used only for the fingerprint; the original request is replayed unchanged.
+ */
 public class RequestDeduplicator {
 
-    private static final Pattern DIGIT_SEGMENT  = Pattern.compile("^\\d+$");
-    private static final Pattern UUID_SEGMENT   = Pattern.compile(
-            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+    private static final Pattern UUID_SEG    = Pattern.compile(
+            "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HEX_SEG     = Pattern.compile("^[0-9a-f]{16,}$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern VERSION_SEG = Pattern.compile("^v\\d+(\\.\\d+)*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern EXTENSION   = Pattern.compile("^(.+)(\\.[a-z0-9]{1,5})$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ARRAY_INDEX = Pattern.compile("\\[\\d*]");
+    private static final Pattern MULTIPART_NAME = Pattern.compile("name=\"([^\"]*)\"");
+    private static final Pattern GRAPHQL_OP  = Pattern.compile("\\b(query|mutation|subscription)\\s+(\\w+)");
 
-    /**
-     * Deduplicates requests by fingerprint. The first request with a given fingerprint
-     * becomes the representative; subsequent matches are stored in its group.
-     */
     public List<RequestGroup> deduplicate(List<HttpRequest> requests) {
         Map<String, RequestGroup> seen = new LinkedHashMap<>();
         for (HttpRequest req : requests) {
             String fp = fingerprint(req);
             RequestGroup group = seen.get(fp);
             if (group == null) {
-                group = new RequestGroup(req, fp);
-                seen.put(fp, group);
+                seen.put(fp, new RequestGroup(req, fp));
             } else {
                 group.addGrouped(req);
             }
@@ -35,107 +46,166 @@ public class RequestDeduplicator {
         return new ArrayList<>(seen.values());
     }
 
-    /**
-     * Computes SHA-256 fingerprint for a request.
-     * Fingerprint = SHA256(METHOD + "\n" + normalizedPath + "\n" + sortedQueryKeys + "\n" + sortedBodyKeys)
-     * Original URL is NOT modified — normalization is only for fingerprinting.
-     */
     public static String fingerprint(HttpRequest req) {
-        String method = req.method().toUpperCase();
-        String path = req.path();
-
-        // Strip query string from path for normalization
-        String pathOnly = path;
+        String path = req.path() == null ? "/" : req.path();
+        int fragment = path.indexOf('#');
+        if (fragment >= 0) path = path.substring(0, fragment);
         String query = "";
         int qIdx = path.indexOf('?');
         if (qIdx >= 0) {
-            pathOnly = path.substring(0, qIdx);
-            query    = path.substring(qIdx + 1);
+            query = path.substring(qIdx + 1);
+            path  = path.substring(0, qIdx);
         }
 
-        String normalizedPath = normalizePath(pathOnly);
-        String sortedQueryKeys = sortedKeys(parseQueryKeys(query));
-        String sortedBodyKeys  = sortedKeys(parseBodyKeys(req));
-
-        String raw = method + "\n" + normalizedPath + "\n" + sortedQueryKeys + "\n" + sortedBodyKeys;
+        BodyShape body = bodyShape(req);
+        String raw = req.method().toUpperCase(Locale.ROOT)
+                + "\n" + origin(req.httpService())
+                + "\n" + normalizePath(path)
+                + "\n" + String.join(",", formKeys(query))
+                + "\n" + body.kind
+                + "\n" + String.join(",", body.keys);
         return sha256(raw);
     }
 
-    /** Replace digit-only and UUID path segments with {id}. */
+    // ── Path ────────────────────────────────────────────────────────────────
+
     static String normalizePath(String path) {
         if (path == null || path.isEmpty()) return "/";
-        String[] segments = path.split("/", -1);
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < segments.length; i++) {
-            String seg = segments[i];
-            if (DIGIT_SEGMENT.matcher(seg).matches() || UUID_SEGMENT.matcher(seg).matches()) {
-                seg = "{id}";
-            }
-            sb.append(seg);
-            if (i < segments.length - 1) sb.append('/');
+        for (String seg : path.split("/")) {
+            if (seg.isEmpty()) continue;
+            sb.append('/').append(normalizeSegment(decode(seg)));
         }
-        return sb.toString();
+        return sb.length() == 0 ? "/" : sb.toString().toLowerCase(Locale.ROOT);
     }
 
-    private static List<String> parseQueryKeys(String query) {
-        List<String> keys = new ArrayList<>();
-        if (query == null || query.isEmpty()) return keys;
-        for (String pair : query.split("&")) {
+    private static String normalizeSegment(String seg) {
+        String name = seg;
+        String ext  = "";
+        Matcher m = EXTENSION.matcher(seg);
+        if (m.matches() && m.group(2).chars().anyMatch(Character::isLetter)) {
+            name = m.group(1);
+            ext  = m.group(2);
+        }
+        return isIdSegment(name) ? "{id}" + ext : seg;
+    }
+
+    /** Heuristic: does this path segment look like an object identifier rather than a route name? */
+    static boolean isIdSegment(String seg) {
+        if (seg.isEmpty()) return false;
+        if (seg.indexOf('@') > 0) return true;
+        if (VERSION_SEG.matcher(seg).matches()) return false;
+
+        int digits = 0;
+        for (int i = 0; i < seg.length(); i++) {
+            if (Character.isDigit(seg.charAt(i))) digits++;
+        }
+        if (digits == seg.length()) return true;
+        if (UUID_SEG.matcher(seg).matches()) return true;
+        if (digits > 0 && HEX_SEG.matcher(seg).matches()) return true;
+        if (digits >= 3) return true;
+        return digits > 0 && seg.length() >= 16;
+    }
+
+    // ── Query / body keys ───────────────────────────────────────────────────
+
+    private static SortedSet<String> formKeys(String encoded) {
+        SortedSet<String> keys = new TreeSet<>();
+        if (encoded == null || encoded.isEmpty()) return keys;
+        for (String pair : encoded.split("&")) {
             int eq = pair.indexOf('=');
-            String key = eq >= 0 ? pair.substring(0, eq) : pair;
-            try { key = URLDecoder.decode(key, StandardCharsets.UTF_8); } catch (Exception ignored) {}
-            if (!key.isEmpty()) keys.add(key.toLowerCase());
+            String key = decode(eq >= 0 ? pair.substring(0, eq) : pair).trim();
+            if (!key.isEmpty()) keys.add(ARRAY_INDEX.matcher(key.toLowerCase(Locale.ROOT)).replaceAll("[]"));
         }
         return keys;
     }
 
-    private static List<String> parseBodyKeys(HttpRequest req) {
-        List<String> keys = new ArrayList<>();
-        String contentType = req.headerValue("Content-Type");
-        if (contentType == null) return keys;
+    private record BodyShape(String kind, SortedSet<String> keys) {}
+
+    private static BodyShape bodyShape(HttpRequest req) {
         String body = req.bodyToString();
-        if (body == null || body.isEmpty()) return keys;
+        if (body == null || body.isBlank()) return new BodyShape("none", new TreeSet<>());
 
-        if (contentType.contains("application/x-www-form-urlencoded")) {
-            keys.addAll(parseQueryKeys(body));
-        } else if (contentType.contains("application/json")) {
-            keys.addAll(extractJsonKeys(body));
+        String ct = Optional.ofNullable(req.headerValue("Content-Type")).orElse("").toLowerCase(Locale.ROOT);
+        String trimmed = body.trim();
+
+        if (ct.contains("json") || trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            SortedSet<String> keys = jsonKeys(trimmed);
+            if (keys != null) return new BodyShape("json", keys);
+        }
+        if (ct.contains("x-www-form-urlencoded")) return new BodyShape("form", formKeys(body));
+        if (ct.contains("multipart/form-data")) {
+            SortedSet<String> keys = new TreeSet<>();
+            Matcher m = MULTIPART_NAME.matcher(body);
+            while (m.find()) keys.add(m.group(1).toLowerCase(Locale.ROOT));
+            return new BodyShape("multipart", keys);
+        }
+        return new BodyShape(ct.isEmpty() ? "raw" : ct.split(";")[0].trim(), new TreeSet<>());
+    }
+
+    /** Key paths of a JSON body (nested keys, arrays collapsed to "[]"); null when not valid JSON. */
+    static SortedSet<String> jsonKeys(String json) {
+        JsonElement root;
+        try {
+            root = JsonParser.parseString(json);
+        } catch (Exception e) {
+            return null;
+        }
+        SortedSet<String> keys = new TreeSet<>();
+        collectJsonKeys(root, "", keys);
+
+        // GraphQL: every operation shares /graphql and {query, variables}; the operation is the endpoint.
+        if (root.isJsonObject()) {
+            String op = graphqlOperation(root.getAsJsonObject());
+            if (op != null) keys.add("graphql:" + op);
         }
         return keys;
     }
 
-    /** Extract top-level JSON keys (shallow) for fingerprinting. */
-    static List<String> extractJsonKeys(String json) {
-        List<String> keys = new ArrayList<>();
-        if (json == null || !json.trim().startsWith("{")) return keys;
-        // Simple regex-free key extraction: look for "key":
-        int i = 0;
-        while (i < json.length()) {
-            int start = json.indexOf('"', i);
-            if (start < 0) break;
-            int end = json.indexOf('"', start + 1);
-            if (end < 0) break;
-            String key = json.substring(start + 1, end);
-            // Check if followed by ':'
-            int colon = json.indexOf(':', end + 1);
-            if (colon >= 0 && json.substring(end + 1, colon).isBlank()) {
-                keys.add(key.toLowerCase());
+    private static void collectJsonKeys(JsonElement el, String prefix, Set<String> out) {
+        if (el.isJsonObject()) {
+            for (Map.Entry<String, JsonElement> e : el.getAsJsonObject().entrySet()) {
+                String key = prefix.isEmpty() ? e.getKey() : prefix + "." + e.getKey();
+                out.add(key.toLowerCase(Locale.ROOT));
+                collectJsonKeys(e.getValue(), key, out);
             }
-            i = end + 1;
+        } else if (el.isJsonArray()) {
+            for (JsonElement item : el.getAsJsonArray()) {
+                collectJsonKeys(item, prefix + "[]", out);
+            }
         }
-        return keys;
     }
 
-    private static String sortedKeys(List<String> keys) {
-        List<String> sorted = new ArrayList<>(keys);
-        Collections.sort(sorted);
-        return String.join(",", sorted);
+    private static String graphqlOperation(JsonObject obj) {
+        JsonElement opName = obj.get("operationName");
+        if (opName != null && opName.isJsonPrimitive()) return opName.getAsString();
+        JsonElement query = obj.get("query");
+        if (query == null || !query.isJsonPrimitive()) return null;
+        String q = query.getAsString();
+        Matcher m = GRAPHQL_OP.matcher(q);
+        if (m.find()) return m.group(1) + " " + m.group(2);
+        return q.replaceAll("\\s+", " ").trim();
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+
+    private static String origin(HttpService service) {
+        if (service == null) return "";
+        return (service.secure() ? "https://" : "http://")
+                + service.host().toLowerCase(Locale.ROOT) + ":" + service.port();
+    }
+
+    private static String decode(String s) {
+        try {
+            return URLDecoder.decode(s, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return s;
+        }
     }
 
     private static String sha256(String input) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
             for (byte b : hash) sb.append(String.format("%02x", b));
             return sb.toString();

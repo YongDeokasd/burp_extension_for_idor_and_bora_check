@@ -9,30 +9,40 @@ import java.awt.*;
 
 public class Theme {
 
-    public static final Color BG          = new Color(0x1e1e1e);
-    public static final Color PANEL       = new Color(0x252525);
-    public static final Color PANEL_ALT   = new Color(0x2c2c2c);
-    public static final Color BORDER      = new Color(0x3a3a3a);
-    public static final Color TEXT        = new Color(0xd4d4d4);
-    public static final Color TEXT_DIM    = new Color(0x888888);
-    public static final Color TEXT_BRIGHT = new Color(0xf0f0f0);
+    public static final Color BG          = Color.WHITE;
+    public static final Color PANEL       = Color.WHITE;
+    public static final Color PANEL_ALT   = new Color(0xf5f5f5);
+    public static final Color SIDEBAR     = new Color(0xf7f7f7);
+    public static final Color INPUT_BG    = Color.WHITE;
+    public static final Color BUTTON_BG   = new Color(0xf0f0f0);
+    public static final Color CHIP_BG     = new Color(0xeeeeee);
+    public static final Color TRACK       = new Color(0xe0e0e0);
+    public static final Color BORDER      = new Color(0xd0d0d0);
+    public static final Color TEXT        = new Color(0x1e1e1e);
+    public static final Color TEXT_DIM    = new Color(0x666666);
+    public static final Color TEXT_MUTED  = new Color(0xaaaaaa);
+    public static final Color TEXT_BRIGHT = Color.BLACK;
     public static final Color ACCENT      = new Color(0xe0721e);
-    public static final Color ACCENT_DIM  = new Color(0xa0500e);
+    public static final Color ACCENT_DIM  = new Color(0xfbe3cf);
+    public static final Color GROUP       = new Color(0x4a4adf);
     public static final Color SAME        = new Color(0xc0392b);
-    public static final Color SAME_BG     = new Color(0x26, 0x0a, 0x08);
-    public static final Color SIMILAR     = new Color(0xe67e22);
-    public static final Color SIMILAR_BG  = new Color(0x28, 0x1a, 0x08);
-    public static final Color DIFF        = new Color(0x27ae60);
-    public static final Color DIFF_BG     = new Color(0x08, 0x20, 0x10);
-    public static final Color ROW_SEL     = new Color(0x1e3a5c);
-    public static final Color STATUS_OK   = new Color(0x7af5a0);
-    public static final Color STATUS_ERR  = new Color(0xf57a7a);
-    public static final Color STATUS_RDR  = new Color(0xf5d07a);
+    public static final Color SAME_BG     = new Color(0xfdecea);
+    public static final Color SIMILAR     = new Color(0xc0650f);
+    public static final Color SIMILAR_BG  = new Color(0xfdf2e6);
+    public static final Color DIFF        = new Color(0x1e8449);
+    public static final Color DIFF_BG     = new Color(0xe9f7ef);
+    public static final Color ROW_SEL     = new Color(0xcfe3fa);
+    public static final Color STATUS_OK   = new Color(0x1e8449);
+    public static final Color STATUS_ERR  = new Color(0xc0392b);
+    public static final Color STATUS_RDR  = new Color(0x9a7d0a);
 
-    public static final Font MONO = new Font(Font.MONOSPACED, Font.PLAIN, 11);
-    public static final Font UI   = new Font(Font.SANS_SERIF, Font.PLAIN, 12);
-    public static final Font UI_BOLD = new Font(Font.SANS_SERIF, Font.BOLD, 12);
-    public static final Font UI_SMALL = new Font(Font.SANS_SERIF, Font.PLAIN, 11);
+    public static final Font MONO       = new Font(Font.MONOSPACED, Font.PLAIN, 13);
+    public static final Font MONO_SMALL = new Font(Font.MONOSPACED, Font.PLAIN, 12);
+    public static final Font MONO_BOLD  = new Font(Font.MONOSPACED, Font.BOLD, 12);
+    public static final Font UI         = new Font(Font.SANS_SERIF, Font.PLAIN, 14);
+    public static final Font UI_BOLD    = new Font(Font.SANS_SERIF, Font.BOLD, 14);
+    public static final Font UI_SMALL   = new Font(Font.SANS_SERIF, Font.PLAIN, 13);
+    public static final Font BADGE      = new Font(Font.SANS_SERIF, Font.BOLD, 12);
 
     public static void apply(JComponent c) {
         c.setBackground(BG);
@@ -48,7 +58,7 @@ public class Theme {
 
     public static JButton button(String text) {
         JButton btn = new JButton(text);
-        btn.setBackground(new Color(0x333333));
+        btn.setBackground(BUTTON_BG);
         btn.setForeground(TEXT);
         btn.setFocusPainted(false);
         btn.setBorder(new LineBorder(BORDER, 1));
@@ -59,8 +69,8 @@ public class Theme {
 
     public static JButton primaryButton(String text) {
         JButton btn = new JButton(text);
-        btn.setBackground(ACCENT_DIM);
-        btn.setForeground(new Color(0xf0d090));
+        btn.setBackground(ACCENT);
+        btn.setForeground(Color.WHITE);
         btn.setFocusPainted(false);
         btn.setBorder(new LineBorder(ACCENT, 1));
         btn.setFont(UI_SMALL);
@@ -83,14 +93,14 @@ public class Theme {
         t.setBackground(PANEL);
         t.setForeground(TEXT);
         t.setFont(UI_SMALL);
-        t.setGridColor(new Color(0x2a2a2a));
+        t.setGridColor(new Color(0xeeeeee));
         t.setSelectionBackground(ROW_SEL);
         t.setSelectionForeground(TEXT_BRIGHT);
-        t.setRowHeight(22);
+        t.setRowHeight(26);
         t.setShowGrid(true);
         t.setIntercellSpacing(new Dimension(0, 1));
         JTableHeader header = t.getTableHeader();
-        header.setBackground(new Color(0x1e1e1e));
+        header.setBackground(PANEL_ALT);
         header.setForeground(TEXT_DIM);
         header.setFont(UI_SMALL);
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER));
@@ -109,7 +119,7 @@ public class Theme {
 
     public static JTextField textField(int cols) {
         JTextField tf = new JTextField(cols);
-        tf.setBackground(new Color(0x1a1a1a));
+        tf.setBackground(INPUT_BG);
         tf.setForeground(TEXT);
         tf.setFont(MONO);
         tf.setCaretColor(TEXT);
@@ -121,7 +131,7 @@ public class Theme {
 
     public static JTextArea textArea() {
         JTextArea ta = new JTextArea();
-        ta.setBackground(new Color(0x1a1a1a));
+        ta.setBackground(INPUT_BG);
         ta.setForeground(TEXT);
         ta.setFont(MONO);
         ta.setCaretColor(TEXT);
@@ -146,7 +156,7 @@ public class Theme {
     public static JLabel accentLabel(String text) {
         JLabel l = new JLabel(text.toUpperCase());
         l.setForeground(ACCENT);
-        l.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 11));
+        l.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 13));
         return l;
     }
 
@@ -162,12 +172,12 @@ public class Theme {
 
     public static JSpinner spinner(int value, int min, int max, int step) {
         JSpinner sp = new JSpinner(new SpinnerNumberModel(value, min, max, step));
-        sp.setBackground(new Color(0x1a1a1a));
+        sp.setBackground(INPUT_BG);
         sp.setForeground(TEXT);
         sp.setFont(MONO);
         JComponent editor = sp.getEditor();
         if (editor instanceof JSpinner.DefaultEditor de) {
-            de.getTextField().setBackground(new Color(0x1a1a1a));
+            de.getTextField().setBackground(INPUT_BG);
             de.getTextField().setForeground(TEXT);
             de.getTextField().setFont(MONO);
             de.getTextField().setCaretColor(TEXT);

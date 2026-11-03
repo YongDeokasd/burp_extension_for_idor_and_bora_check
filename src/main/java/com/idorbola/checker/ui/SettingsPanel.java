@@ -101,7 +101,7 @@ public class SettingsPanel extends JPanel {
 
     private void buildUI() {
         // Left sidebar
-        JPanel sidebar = Theme.panel(new Color(0x202020));
+        JPanel sidebar = Theme.panel(Theme.SIDEBAR);
         sidebar.setPreferredSize(new Dimension(160, 0));
         sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
         sidebar.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Theme.BORDER));
@@ -113,7 +113,7 @@ public class SettingsPanel extends JPanel {
 
         for (int i = 0; i < navLabels.length; i++) {
             JButton btn = new JButton(navLabels[i]);
-            btn.setBackground(new Color(0x202020));
+            btn.setBackground(Theme.SIDEBAR);
             btn.setForeground(Theme.TEXT_DIM);
             btn.setFocusPainted(false);
             btn.setBorderPainted(false);
@@ -159,7 +159,7 @@ public class SettingsPanel extends JPanel {
                         BorderFactory.createMatteBorder(0, 2, 0, 0, Theme.ACCENT),
                         new EmptyBorder(6, 10, 6, 8)));
             } else {
-                btn.setBackground(new Color(0x202020));
+                btn.setBackground(Theme.SIDEBAR);
                 btn.setForeground(Theme.TEXT_DIM);
                 btn.setBorder(new EmptyBorder(6, 12, 6, 8));
             }
@@ -418,15 +418,15 @@ public class SettingsPanel extends JPanel {
     private void rebuildTags(JPanel panel, Iterable<String> items, java.util.function.Consumer<String> remover, Runnable rebuilder) {
         panel.removeAll();
         for (String item : new ArrayList<>(items instanceof Set<?> s ? new ArrayList<>((Set<String>) s) : (List<String>) items)) {
-            JPanel chip = Theme.panel(new Color(0x333333));
+            JPanel chip = Theme.panel(Theme.CHIP_BG);
             chip.setLayout(new FlowLayout(FlowLayout.LEFT, 4, 2));
-            chip.setBorder(new LineBorder(new Color(0x4a4a4a), 1));
+            chip.setBorder(new LineBorder(Theme.BORDER, 1));
             JLabel lbl = Theme.label(item);
             lbl.setFont(Theme.MONO);
             JButton x = new JButton("×");
-            x.setBackground(new Color(0x333333));
+            x.setBackground(Theme.CHIP_BG);
             x.setForeground(Theme.TEXT_DIM);
-            x.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+            x.setFont(Theme.UI_SMALL);
             x.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
             x.setFocusPainted(false);
             x.setContentAreaFilled(false);

@@ -7,6 +7,7 @@ import com.idorbola.checker.model.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -18,11 +19,19 @@ public class ScanEngine {
         void onProgress(int done, int total);
         void onComplete();
         void onError(String message);
+        /** Scan plan: requests received, how many were filtered out, how many endpoints will be replayed. */
+        default void onPlanned(int received, int excluded, int toScan) {}
+        /** An endpoint already scanned earlier (same fingerprint); not replayed again. */
+        default void onDuplicate(RequestGroup group) {}
     }
+
+    /** Row numbering and already-scanned fingerprints shared by every scan appended to the same table. */
+    public record ScanContext(AtomicInteger rowCounter, Set<String> scannedFingerprints) {}
 
     private final MontoyaApi api;
     private final ScanConfig config;
     private final ScanListener listener;
+    private final ScanContext context;
 
     private final RequestDeduplicator deduplicator = new RequestDeduplicator();
     private final ProfileReplacer replacer = new ProfileReplacer();
@@ -30,11 +39,13 @@ public class ScanEngine {
 
     private final AtomicBoolean cancelled  = new AtomicBoolean(false);
     private final AtomicBoolean paused     = new AtomicBoolean(false);
+    private final Set<String> delivered    = ConcurrentHashMap.newKeySet();
     private ExecutorService executor;
 
-    public ScanEngine(MontoyaApi api, ScanConfig config, ScanListener listener) {
+    public ScanEngine(MontoyaApi api, ScanConfig config, ScanContext context, ScanListener listener) {
         this.api      = api;
         this.config   = config;
+        this.context  = context;
         this.listener = listener;
     }
 
@@ -51,9 +62,10 @@ public class ScanEngine {
 
     private void runScan(List<HttpRequest> requests) {
         try {
-            // 1. Filter static resources and excluded patterns
+            // 1. Filter OPTIONS (CORS preflight, no authorization semantics), static resources, exclusions
             List<HttpRequest> filtered = new ArrayList<>();
             for (HttpRequest req : requests) {
+                if ("OPTIONS".equalsIgnoreCase(req.method())) continue;
                 String path = req.path();
                 int qIdx = path.indexOf('?');
                 String pathOnly = qIdx >= 0 ? path.substring(0, qIdx) : path;
@@ -62,28 +74,33 @@ public class ScanEngine {
                 filtered.add(req);
             }
 
-            // 2. Deduplicate (or use all)
-            List<RequestGroup> groups;
+            // 2. Deduplicate within this batch and against endpoints already in the results table
+            List<RequestGroup> groups = new ArrayList<>();
             if (config.isDeduplicationEnabled()) {
-                groups = deduplicator.deduplicate(filtered);
+                for (RequestGroup g : deduplicator.deduplicate(filtered)) {
+                    if (context.scannedFingerprints().add(g.getFingerprint())) {
+                        groups.add(g);
+                    } else {
+                        listener.onDuplicate(g);
+                    }
+                }
             } else {
-                groups = new ArrayList<>();
                 for (HttpRequest req : filtered) {
                     groups.add(new RequestGroup(req, RequestDeduplicator.fingerprint(req)));
                 }
             }
 
             int total = groups.size();
+            listener.onPlanned(requests.size(), requests.size() - filtered.size(), total);
             AtomicInteger done = new AtomicInteger(0);
 
             // Rate limiter: tokens per second
             RateLimiter rateLimiter = new RateLimiter(config.getRateLimitPerSecond());
 
             List<Future<?>> futures = new ArrayList<>();
-            for (int i = 0; i < groups.size(); i++) {
+            for (RequestGroup group : groups) {
                 if (cancelled.get()) break;
-                final RequestGroup group = groups.get(i);
-                final int rowIdx = i;
+                final int rowIdx = context.rowCounter().getAndIncrement();
 
                 Future<?> f = executor.submit(() -> {
                     try {
@@ -104,7 +121,16 @@ public class ScanEngine {
                 try { f.get(); } catch (Exception ignored) {}
             }
 
-            if (!cancelled.get()) listener.onComplete();
+            if (cancelled.get()) {
+                // Endpoints never replayed must stay scannable by a later scan.
+                if (config.isDeduplicationEnabled()) {
+                    for (RequestGroup g : groups) {
+                        if (!delivered.contains(g.getFingerprint())) context.scannedFingerprints().remove(g.getFingerprint());
+                    }
+                }
+            } else {
+                listener.onComplete();
+            }
 
         } catch (Exception e) {
             listener.onError("Scan failed: " + e.getMessage());
@@ -163,6 +189,7 @@ public class ScanEngine {
             }
         }
 
+        delivered.add(group.getFingerprint());
         listener.onResult(result);
     }
 

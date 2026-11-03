@@ -66,18 +66,25 @@ public class MainPanel extends JPanel {
             tabs.setSelectedIndex(1);
             resultsPanel.prepareScan(config);
 
-            ScanEngine engine = new ScanEngine(api, config, new ScanEngine.ScanListener() {
+            ScanEngine.ScanListener ui = resultsPanel.getScanListener();
+            ScanEngine engine = new ScanEngine(api, config, resultsPanel.getScanContext(), new ScanEngine.ScanListener() {
                 @Override public void onResult(com.idorbola.checker.model.ScanResult r) {
-                    SwingUtilities.invokeLater(() -> resultsPanel.getScanListener().onResult(r));
+                    SwingUtilities.invokeLater(() -> ui.onResult(r));
                 }
                 @Override public void onProgress(int done, int total) {
-                    SwingUtilities.invokeLater(() -> resultsPanel.getScanListener().onProgress(done, total));
+                    SwingUtilities.invokeLater(() -> ui.onProgress(done, total));
                 }
                 @Override public void onComplete() {
-                    SwingUtilities.invokeLater(() -> resultsPanel.getScanListener().onComplete());
+                    SwingUtilities.invokeLater(ui::onComplete);
                 }
                 @Override public void onError(String msg) {
-                    SwingUtilities.invokeLater(() -> resultsPanel.getScanListener().onError(msg));
+                    SwingUtilities.invokeLater(() -> ui.onError(msg));
+                }
+                @Override public void onPlanned(int received, int excluded, int toScan) {
+                    SwingUtilities.invokeLater(() -> ui.onPlanned(received, excluded, toScan));
+                }
+                @Override public void onDuplicate(com.idorbola.checker.model.RequestGroup group) {
+                    SwingUtilities.invokeLater(() -> ui.onDuplicate(group));
                 }
             });
 
