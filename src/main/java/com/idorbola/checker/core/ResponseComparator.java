@@ -1,5 +1,6 @@
 package com.idorbola.checker.core;
 
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class ResponseComparator {
@@ -11,11 +12,17 @@ public class ResponseComparator {
             "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:?\\d{2})?");
     private static final Pattern LARGE_NUMBER_PATTERN = Pattern.compile("\\b\\d{6,}\\b");
 
-    // Pattern for hidden input values in HTML (CSRF tokens)
-    private static final Pattern HIDDEN_INPUT_PATTERN = Pattern.compile(
-            "<input[^>]+type=[\"']hidden[\"'][^>]*>", Pattern.CASE_INSENSITIVE);
-    private static final Pattern VALUE_ATTR_PATTERN = Pattern.compile(
-            "value=[\"']([^\"']*)[\"']", Pattern.CASE_INSENSITIVE);
+    // Per-request HTML values (CSRF tokens, nonces) that differ on every response
+    private static final Pattern INPUT_TAG = Pattern.compile("<input\\b[^>]*>", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HIDDEN_TYPE = Pattern.compile("\\btype\\s*=\\s*[\"']?hidden\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern VALUE_ATTR = Pattern.compile(
+            "\\bvalue\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CSRF_META = Pattern.compile(
+            "<meta\\b[^>]*\\bname\\s*=\\s*[\"'][^\"']*(csrf|xsrf)[^\"']*[\"'][^>]*>", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CONTENT_ATTR = Pattern.compile(
+            "\\bcontent\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern NONCE_ATTR = Pattern.compile(
+            "\\bnonce\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>]+)", Pattern.CASE_INSENSITIVE);
 
     /**
      * Compare two response bodies and return a similarity score [0.0, 1.0].
@@ -45,13 +52,7 @@ public class ResponseComparator {
     }
 
     private float compareHtml(String a, String b) {
-        String csrfA = extractHiddenValues(a);
-        String csrfB = extractHiddenValues(b);
-        // If no hidden inputs found, fall back to text comparison
-        if (csrfA.isEmpty() && csrfB.isEmpty()) {
-            return compareText(a, b);
-        }
-        return levenshteinRatio(csrfA, csrfB);
+        return compareText(normalizeHtml(a), normalizeHtml(b));
     }
 
     private float compareText(String a, String b) {
@@ -69,17 +70,25 @@ public class ResponseComparator {
         return result;
     }
 
-    /** Extract all hidden input values concatenated (for CSRF comparison). */
-    static String extractHiddenValues(String html) {
-        StringBuilder sb = new StringBuilder();
-        var matcher = HIDDEN_INPUT_PATTERN.matcher(html);
-        while (matcher.find()) {
-            String tag = matcher.group();
-            var valueMatcher = VALUE_ATTR_PATTERN.matcher(tag);
-            if (valueMatcher.find()) {
-                sb.append(valueMatcher.group(1)).append("|");
+    /** Blank values that change on every response (hidden inputs, CSRF meta tags, nonces); keep the rest of the page. */
+    static String normalizeHtml(String html) {
+        String result = replaceInTags(html, INPUT_TAG, VALUE_ATTR, "value=\"__HIDDEN__\"", true);
+        result = replaceInTags(result, CSRF_META, CONTENT_ATTR, "content=\"__CSRF__\"", false);
+        return NONCE_ATTR.matcher(result).replaceAll("nonce=\"__NONCE__\"");
+    }
+
+    private static String replaceInTags(String html, Pattern tagPattern, Pattern attrPattern,
+                                        String replacement, boolean hiddenInputsOnly) {
+        Matcher tags = tagPattern.matcher(html);
+        StringBuilder sb = new StringBuilder(html.length());
+        while (tags.find()) {
+            String tag = tags.group();
+            if (!hiddenInputsOnly || HIDDEN_TYPE.matcher(tag).find()) {
+                tag = attrPattern.matcher(tag).replaceAll(Matcher.quoteReplacement(replacement));
             }
+            tags.appendReplacement(sb, Matcher.quoteReplacement(tag));
         }
+        tags.appendTail(sb);
         return sb.toString();
     }
 

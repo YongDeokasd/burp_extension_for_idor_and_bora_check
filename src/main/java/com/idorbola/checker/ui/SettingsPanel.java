@@ -230,9 +230,9 @@ public class SettingsPanel extends JPanel {
         form.setBorder(new EmptyBorder(10, 12, 10, 12));
 
         addFormRow(form, "Thread Pool Size:", threadPoolSpinner, "", 0);
-        addFormRow(form, "Rate Limit:", rateLimitSpinner, "req/s  (N profiles × rate = actual server req/s)", 1);
+        addFormRow(form, "Rate Limit:", rateLimitSpinner, "req/s, total for all profiles combined", 1);
         addFormRow(form, "Profile Delay:", profileDelaySpinner, "ms between profiles", 2);
-        addFormRow(form, "Timeout:", timeoutSpinner, "seconds", 3);
+        addFormRow(form, "Timeout:", timeoutSpinner, "seconds to wait for each response", 3);
 
         p.add(form, BorderLayout.NORTH);
         return p;
@@ -244,19 +244,17 @@ public class SettingsPanel extends JPanel {
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
         form.setBorder(new EmptyBorder(10, 12, 10, 12));
 
-        JLabel intro = Theme.dimLabel("<html><div style='width:600px'>Choose how aggressively duplicate requests are merged before replay. "
-                + "Only one request per group is replayed; the Group column shows how many were merged.</div></html>");
-        intro.setAlignmentX(LEFT_ALIGNMENT);
-        form.add(intro);
+        form.add(Theme.note("Choose how aggressively duplicate requests are merged before replay. "
+                + "Only one request per group is replayed; the Group column shows how many were merged."));
         form.add(Box.createVerticalStrut(10));
 
         for (DedupLevel level : DedupLevel.values()) {
             JRadioButton rb = dedupButtons.get(level);
             rb.setAlignmentX(LEFT_ALIGNMENT);
             form.add(rb);
-            JLabel desc = Theme.dimLabel("<html><div style='width:520px'>" + level.getDescription() + "</div></html>");
+            JTextArea desc = Theme.note(level.getDescription());
             desc.setBorder(new EmptyBorder(0, 26, 10, 0));
-            desc.setAlignmentX(LEFT_ALIGNMENT);
+            desc.setMaximumSize(desc.getPreferredSize());
             form.add(desc);
         }
 
@@ -270,9 +268,9 @@ public class SettingsPanel extends JPanel {
         inner.setLayout(new BorderLayout(0, 6));
         inner.setBorder(new EmptyBorder(10, 12, 6, 12));
 
-        inner.add(Theme.dimLabel(
-                "<html>One pattern per line. Formats: /path/prefix/*, METHOD:/path, /exact/path<br>"
-                + "Examples: /api/auth/logout &nbsp; POST:/api/user/delete &nbsp; DELETE:/api/admin/*</html>"),
+        inner.add(Theme.note(
+                "One pattern per line. Formats: /path/prefix/*, METHOD:/path, /exact/path\n"
+                + "Examples: /api/auth/logout, POST:/api/user/delete, DELETE:/api/admin/*"),
                 BorderLayout.NORTH);
 
         inner.add(Theme.scrollPane(exclusionArea), BorderLayout.CENTER);
@@ -368,11 +366,15 @@ public class SettingsPanel extends JPanel {
         row.add(Theme.label("Similarity Threshold:"));
         row.add(similaritySpinner);
         row.add(Theme.dimLabel("% (≥threshold → SIMILAR, ≥99.9% → SAME)"));
+        row.setAlignmentX(LEFT_ALIGNMENT);
+        row.setMaximumSize(row.getPreferredSize());
         form.add(row);
         form.add(Box.createVerticalStrut(8));
-        form.add(Theme.dimLabel("<html>Comparison target: response body only (headers excluded<br>"
-                + "to avoid Date, X-Request-Time pollution).<br>"
-                + "JSON: normalizes dynamic values. HTML: compares CSRF hidden inputs only.</html>"));
+        form.add(Theme.note("Comparison target: response body only (headers are excluded so values such as "
+                + "Date or X-Request-Time do not affect the result).\n"
+                + "JSON: UUIDs, timestamps and long numbers are normalized before comparing.\n"
+                + "HTML: the whole page is compared after blanking per-request values "
+                + "(hidden input values such as CSRF tokens, csrf/xsrf meta tags, script nonces)."));
 
         p.add(form, BorderLayout.NORTH);
         return p;

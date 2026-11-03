@@ -66,7 +66,9 @@ build/libs/idor-bola-checker-1.0.0.jar
 - **다중 프로필 동시 재전송**: 스레드 풀, 초당 요청 수 제한, 프로필 간 딜레이 설정
 - **중복 제거 4단계**: Off / Low / Medium / High 중 선택
 - **필터링**: OPTIONS 요청 항상 제외, 정적 리소스(확장자·경로 프리픽스) 제외, 사용자 정의 제외 엔드포인트
-- **응답 비교**: 바디만 비교(헤더 제외), Content-Type별 정규화, 유사도 임계값 설정
+- **응답 비교**: 바디만 비교(헤더 제외), 유사도 임계값 설정. 매 요청마다 바뀌는 값은 비교 전에 정규화
+  - JSON: UUID, 타임스탬프, 긴 숫자
+  - HTML: hidden input 값(CSRF 토큰 등), csrf/xsrf meta 태그, script nonce. 나머지 페이지 내용은 그대로 비교
 - **결과 대시보드**: 비교할 프로필 쌍 선택, 판정·메서드·상태코드·URL 필터, 요청/응답 보기, Diff 보기
 - **결과 누적**: 새 스캔 결과가 기존 결과 뒤에 추가되고, 이미 점검한 엔드포인트는 다시 보내지 않음. `Clear`로 초기화
 - **단축키**: HTTP history `Ctrl+Shift+C` → 스캔, 결과 화면 `Ctrl+R` → Repeater, `Ctrl+I` → Intruder
@@ -91,7 +93,7 @@ build/libs/idor-bola-checker-1.0.0.jar
 
 | 섹션 | 내용 |
 |---|---|
-| **Replay Settings** | Thread Pool Size, Rate Limit(req/s), Profile Delay(ms). Rate Limit은 모든 프로필의 요청을 합친 **전체 초당 상한**이라, 프로필이 3개면 엔드포인트 처리 속도는 약 1/3이 됨 |
+| **Replay Settings** | Thread Pool Size, Rate Limit(req/s), Profile Delay(ms), Timeout(응답 대기 시간, 초). Rate Limit은 모든 프로필의 요청을 합친 **전체 초당 상한**이라, 프로필이 3개면 엔드포인트 처리 속도는 약 1/3이 됨 |
 | **Dedup Settings** | 중복 제거 단계 선택 (아래 표) |
 | **Exclusion Endpoints** | 재전송하지 않을 엔드포인트. 한 줄에 하나: `/api/auth/logout`(정확히 일치), `/api/payment/*`(프리픽스), `POST:/api/user/delete`(메서드 지정) |
 | **Static Filter** | 제외할 확장자(.js, .css, .png, .map 등)와 경로 프리픽스(/static/, /assets/ 등). `.pdf`는 권한 점검 대상이라 기본적으로 제외하지 않음 |
@@ -163,7 +165,7 @@ build/libs/idor-bola-checker-1.0.0.jar
 
 ## 제한 사항
 
-- **Timeout 설정은 아직 적용되지 않습니다.** Settings → Replay의 Timeout 값은 저장만 되고, 요청에는 Burp의 기본 네트워크 타임아웃이 사용됩니다.
+- Timeout 설정은 Burp 2024.12(Montoya API 2024.12) 이상에서 적용됩니다. 그보다 오래된 Burp에서는 Burp 기본 네트워크 타임아웃이 쓰입니다.
 - **응답 비교는 바디 앞 4,000자까지만** 사용합니다. 그 뒤에서만 달라지는 큰 응답은 `SAME`으로 보일 수 있습니다.
 - 바디가 둘 다 비어 있으면 `SAME`(100%)으로 판정됩니다(예: 204 No Content).
 - OPTIONS 요청은 설정과 관계없이 항상 재전송하지 않습니다.

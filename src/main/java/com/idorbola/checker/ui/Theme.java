@@ -153,6 +153,43 @@ public class Theme {
         return l;
     }
 
+    /** Wrapping explanatory text. Plain text on purpose: Burp shows the markup of HTML labels as-is. */
+    public static JTextArea note(String text) {
+        // Pre-wrapped instead of setLineWrap(true): a wrapping JTextArea in a BoxLayout gets its
+        // height before its width is known and clips everything after the first line.
+        JTextArea ta = new JTextArea(wrap(text, 105));
+        ta.setEditable(false);
+        ta.setFocusable(false);
+        ta.setOpaque(false);
+        ta.setBorder(null);
+        ta.setForeground(TEXT_DIM);
+        ta.setFont(UI_SMALL);
+        ta.setAlignmentX(Component.LEFT_ALIGNMENT);
+        ta.setMaximumSize(ta.getPreferredSize());
+        return ta;
+    }
+
+    static String wrap(String text, int width) {
+        StringBuilder out = new StringBuilder();
+        for (String paragraph : text.split("\n", -1)) {
+            if (out.length() > 0) out.append('\n');
+            int lineLen = 0;
+            for (String word : paragraph.split(" ")) {
+                if (word.isEmpty()) continue;
+                if (lineLen > 0 && lineLen + 1 + word.length() > width) {
+                    out.append('\n');
+                    lineLen = 0;
+                } else if (lineLen > 0) {
+                    out.append(' ');
+                    lineLen++;
+                }
+                out.append(word);
+                lineLen += word.length();
+            }
+        }
+        return out.toString();
+    }
+
     public static JLabel accentLabel(String text) {
         JLabel l = new JLabel(text.toUpperCase());
         l.setForeground(ACCENT);
