@@ -13,7 +13,7 @@ import java.util.Objects;
 /** Proxy > HTTP history: the hotkey sends the selected rows to the IDOR/BOLA scan (same as "Scan selected"). */
 final class HistoryHotKey {
 
-    static final String KEY = "Ctrl+C";
+    static final String KEY = "Ctrl+Shift+C";
 
     private HistoryHotKey() {}
 
