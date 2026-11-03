@@ -1,5 +1,6 @@
 package com.idorbola.checker.ui;
 
+import com.idorbola.checker.model.DedupLevel;
 import com.idorbola.checker.model.ScanConfig;
 import com.idorbola.checker.model.UserProfile;
 
@@ -25,7 +26,7 @@ public class SettingsPanel extends JPanel {
     private final JSpinner timeoutSpinner;
 
     // Dedup
-    private final JToggleButton dedupToggle;
+    private final Map<DedupLevel, JRadioButton> dedupButtons = new EnumMap<>(DedupLevel.class);
 
     // Exclusion patterns
     private final JTextArea exclusionArea;
@@ -70,15 +71,18 @@ public class SettingsPanel extends JPanel {
         profileTable.getColumnModel().getColumn(0).setMaxWidth(50);
         profileTable.getColumnModel().getColumn(3).setMaxWidth(80);
 
-        // Dedup toggle
-        dedupToggle = new JToggleButton("ON");
-        dedupToggle.setSelected(true);
-        dedupToggle.setBackground(Theme.ACCENT_DIM);
-        dedupToggle.setForeground(Theme.TEXT_BRIGHT);
-        dedupToggle.setFont(Theme.UI_SMALL);
-        dedupToggle.setBorder(new LineBorder(Theme.ACCENT, 1));
-        dedupToggle.setFocusPainted(false);
-        dedupToggle.addActionListener(e -> dedupToggle.setText(dedupToggle.isSelected() ? "ON" : "OFF"));
+        // Dedup level radio buttons
+        ButtonGroup dedupGroup = new ButtonGroup();
+        for (DedupLevel level : DedupLevel.values()) {
+            JRadioButton rb = new JRadioButton(level.getLabel());
+            rb.setBackground(Theme.PANEL);
+            rb.setForeground(Theme.TEXT);
+            rb.setFont(Theme.UI_BOLD);
+            rb.setFocusPainted(false);
+            dedupGroup.add(rb);
+            dedupButtons.put(level, rb);
+        }
+        dedupButtons.get(DedupLevel.MEDIUM).setSelected(true);
 
         // Exclusion text area
         exclusionArea = Theme.textArea();
@@ -101,7 +105,7 @@ public class SettingsPanel extends JPanel {
 
     private void buildUI() {
         // Left sidebar
-        JPanel sidebar = Theme.panel(new Color(0x202020));
+        JPanel sidebar = Theme.panel(Theme.SIDEBAR);
         sidebar.setPreferredSize(new Dimension(160, 0));
         sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
         sidebar.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, Theme.BORDER));
@@ -113,7 +117,7 @@ public class SettingsPanel extends JPanel {
 
         for (int i = 0; i < navLabels.length; i++) {
             JButton btn = new JButton(navLabels[i]);
-            btn.setBackground(new Color(0x202020));
+            btn.setBackground(Theme.SIDEBAR);
             btn.setForeground(Theme.TEXT_DIM);
             btn.setFocusPainted(false);
             btn.setBorderPainted(false);
@@ -159,7 +163,7 @@ public class SettingsPanel extends JPanel {
                         BorderFactory.createMatteBorder(0, 2, 0, 0, Theme.ACCENT),
                         new EmptyBorder(6, 10, 6, 8)));
             } else {
-                btn.setBackground(new Color(0x202020));
+                btn.setBackground(Theme.SIDEBAR);
                 btn.setForeground(Theme.TEXT_DIM);
                 btn.setBorder(new EmptyBorder(6, 12, 6, 8));
             }
@@ -240,16 +244,21 @@ public class SettingsPanel extends JPanel {
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
         form.setBorder(new EmptyBorder(10, 12, 10, 12));
 
-        JPanel row = Theme.panel(Theme.PANEL);
-        row.setLayout(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        row.add(Theme.label("Deduplication:"));
-        row.add(dedupToggle);
-        form.add(row);
-        form.add(Box.createVerticalStrut(8));
+        JLabel intro = Theme.dimLabel("<html><div style='width:600px'>Choose how aggressively duplicate requests are merged before replay. "
+                + "Only one request per group is replayed; the Group column shows how many were merged.</div></html>");
+        intro.setAlignmentX(LEFT_ALIGNMENT);
+        form.add(intro);
+        form.add(Box.createVerticalStrut(10));
 
-        JLabel desc = Theme.dimLabel("<html>Fingerprint = SHA256(Method + NormalizedPath + QueryKeys + BodyKeys)<br>"
-                + "When OFF, all URLs are tested individually.</html>");
-        form.add(desc);
+        for (DedupLevel level : DedupLevel.values()) {
+            JRadioButton rb = dedupButtons.get(level);
+            rb.setAlignmentX(LEFT_ALIGNMENT);
+            form.add(rb);
+            JLabel desc = Theme.dimLabel("<html><div style='width:520px'>" + level.getDescription() + "</div></html>");
+            desc.setBorder(new EmptyBorder(0, 26, 10, 0));
+            desc.setAlignmentX(LEFT_ALIGNMENT);
+            form.add(desc);
+        }
 
         p.add(form, BorderLayout.NORTH);
         return p;
@@ -418,15 +427,15 @@ public class SettingsPanel extends JPanel {
     private void rebuildTags(JPanel panel, Iterable<String> items, java.util.function.Consumer<String> remover, Runnable rebuilder) {
         panel.removeAll();
         for (String item : new ArrayList<>(items instanceof Set<?> s ? new ArrayList<>((Set<String>) s) : (List<String>) items)) {
-            JPanel chip = Theme.panel(new Color(0x333333));
+            JPanel chip = Theme.panel(Theme.CHIP_BG);
             chip.setLayout(new FlowLayout(FlowLayout.LEFT, 4, 2));
-            chip.setBorder(new LineBorder(new Color(0x4a4a4a), 1));
+            chip.setBorder(new LineBorder(Theme.BORDER, 1));
             JLabel lbl = Theme.label(item);
             lbl.setFont(Theme.MONO);
             JButton x = new JButton("×");
-            x.setBackground(new Color(0x333333));
+            x.setBackground(Theme.CHIP_BG);
             x.setForeground(Theme.TEXT_DIM);
-            x.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+            x.setFont(Theme.UI_SMALL);
             x.setBorder(BorderFactory.createEmptyBorder(0, 2, 0, 2));
             x.setFocusPainted(false);
             x.setContentAreaFilled(false);
@@ -457,7 +466,7 @@ public class SettingsPanel extends JPanel {
     public ScanConfig getConfig() {
         ScanConfig cfg = new ScanConfig();
         cfg.setProfiles(new ArrayList<>(profiles));
-        cfg.setDeduplicationEnabled(dedupToggle.isSelected());
+        dedupButtons.forEach((level, rb) -> { if (rb.isSelected()) cfg.setDedupLevel(level); });
         cfg.setThreadPoolSize((Integer) threadPoolSpinner.getValue());
         cfg.setRateLimitPerSecond((Integer) rateLimitSpinner.getValue());
         cfg.setProfileDelayMs((Integer) profileDelaySpinner.getValue());
@@ -479,8 +488,7 @@ public class SettingsPanel extends JPanel {
         profiles.addAll(config.getProfiles());
         refreshProfileTable();
 
-        dedupToggle.setSelected(config.isDeduplicationEnabled());
-        dedupToggle.setText(config.isDeduplicationEnabled() ? "ON" : "OFF");
+        dedupButtons.get(config.getDedupLevel()).setSelected(true);
         threadPoolSpinner.setValue(config.getThreadPoolSize());
         rateLimitSpinner.setValue(config.getRateLimitPerSecond());
         profileDelaySpinner.setValue(config.getProfileDelayMs());

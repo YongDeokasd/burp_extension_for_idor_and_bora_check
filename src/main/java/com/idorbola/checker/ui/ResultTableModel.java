@@ -2,10 +2,13 @@ package com.idorbola.checker.ui;
 
 import com.idorbola.checker.model.ScanResult;
 import com.idorbola.checker.model.Verdict;
+import com.idorbola.checker.util.HttpText;
 
 import javax.swing.table.AbstractTableModel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 public class ResultTableModel extends AbstractTableModel {
 
@@ -18,6 +21,13 @@ public class ResultTableModel extends AbstractTableModel {
     private String p2Id = null;
     private Verdict filterVerdict = null;
     private String searchQuery = "";
+    private String methodFilter = null;
+    private String p1StatusFilter = null;
+    private String p2StatusFilter = null;
+
+    public static final String ANY = "Any";
+    public static final String NO_RESPONSE = "No response";
+    public static final String[] STATUS_CLASSES = {ANY, "2xx", "3xx", "4xx", "5xx", NO_RESPONSE};
 
     private int threshold = 80;
 
@@ -45,7 +55,7 @@ public class ResultTableModel extends AbstractTableModel {
         return switch (col) {
             case 0 -> r.getRowIndex() + 1;
             case 1 -> r.getGroup().getRepresentative().method();
-            case 2 -> r.getGroup().getRepresentative().path();
+            case 2 -> HttpText.displayPath(r.getGroup().getRepresentative().path());
             case 3 -> r.getGroup().size() > 1 ? r.getGroup().size() : null;
             case 4 -> p1Id != null ? r.getStatus(p1Id) : -1;
             case 5 -> p2Id != null ? r.getStatus(p2Id) : -1;
@@ -99,22 +109,64 @@ public class ResultTableModel extends AbstractTableModel {
         applyFilter();
     }
 
+    /** null or {@link #ANY} shows every method. */
+    public void setMethodFilter(String method) {
+        this.methodFilter = method == null || ANY.equals(method) ? null : method;
+        applyFilter();
+    }
+
+    /** Values from {@link #STATUS_CLASSES}; null or {@link #ANY} disables the filter. */
+    public void setStatusFilters(String p1Status, String p2Status) {
+        this.p1StatusFilter = p1Status == null || ANY.equals(p1Status) ? null : p1Status;
+        this.p2StatusFilter = p2Status == null || ANY.equals(p2Status) ? null : p2Status;
+        applyFilter();
+    }
+
+    public SortedSet<String> getMethods() {
+        SortedSet<String> methods = new TreeSet<>();
+        for (ScanResult r : allResults) methods.add(r.getGroup().getRepresentative().method());
+        return methods;
+    }
+
+    public ScanResult findByFingerprint(String fingerprint) {
+        for (ScanResult r : allResults) {
+            if (r.getGroup().getFingerprint().equals(fingerprint)) return r;
+        }
+        return null;
+    }
+
+    /** Re-evaluates filters and repaints, e.g. after a group gained merged duplicates. */
+    public void refresh() {
+        applyFilter();
+    }
+
     private void applyFilter() {
         filteredResults.clear();
         for (ScanResult r : allResults) {
             if (!matchesSearch(r)) continue;
             if (!matchesVerdictFilter(r)) continue;
+            if (methodFilter != null && !methodFilter.equals(r.getGroup().getRepresentative().method())) continue;
+            if (p1Id != null && !matchesStatus(r.getStatus(p1Id), p1StatusFilter)) continue;
+            if (p2Id != null && !matchesStatus(r.getStatus(p2Id), p2StatusFilter)) continue;
             filteredResults.add(r);
         }
         fireTableDataChanged();
     }
 
+    private static boolean matchesStatus(int code, String statusClass) {
+        if (statusClass == null) return true;
+        if (NO_RESPONSE.equals(statusClass)) return code < 0;
+        return code >= 0 && code / 100 == statusClass.charAt(0) - '0';
+    }
+
     private boolean matchesSearch(ScanResult r) {
         if (searchQuery.isEmpty()) return true;
-        String url = r.getGroup().getRepresentative().path().toLowerCase();
+        String rawPath = r.getGroup().getRepresentative().path();
+        String url = rawPath.toLowerCase();
+        String decoded = HttpText.displayPath(rawPath).toLowerCase();
         String host = "";
         try { host = r.getGroup().getRepresentative().httpService().host().toLowerCase(); } catch (Exception ignored) {}
-        return url.contains(searchQuery) || host.contains(searchQuery);
+        return url.contains(searchQuery) || decoded.contains(searchQuery) || host.contains(searchQuery);
     }
 
     private boolean matchesVerdictFilter(ScanResult r) {

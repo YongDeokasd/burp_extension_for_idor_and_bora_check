@@ -3,14 +3,17 @@ package com.idorbola.checker.ui;
 import com.idorbola.checker.core.ScanEngine;
 import com.idorbola.checker.model.*;
 import com.idorbola.checker.util.CsvExporter;
+import com.idorbola.checker.util.HttpText;
 
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -40,6 +43,11 @@ public class ResultsPanel extends JPanel {
     private final JToggleButton filterSame;
     private final JToggleButton filterSimilar;
     private final JToggleButton filterDiff;
+    private final JComboBox<String> methodFilter;
+    private final JComboBox<String> p1StatusFilter;
+    private final JComboBox<String> p2StatusFilter;
+    private final JLabel p1StatusLabel;
+    private final JLabel p2StatusLabel;
     private final JTextField searchField;
 
     // Table
@@ -60,6 +68,15 @@ public class ResultsPanel extends JPanel {
     private final AtomicInteger doneCount   = new AtomicInteger(0);
     private final AtomicInteger errorCount  = new AtomicInteger(0);
     private final AtomicLong    scanStart   = new AtomicLong(0);
+    private int skippedDuplicates = 0;
+    private int scanTotal = 0;
+
+    // Shared by every scan appended to this table; reset by Clear.
+    private final ScanEngine.ScanContext scanContext =
+            new ScanEngine.ScanContext(new AtomicInteger(0), ConcurrentHashMap.newKeySet());
+    // Duplicates reported before their original row arrived (scan still in flight).
+    private final Map<String, List<RequestGroup>> pendingMerges = new HashMap<>();
+    private final ScanEngine.ScanListener scanListener = createScanListener();
 
     public ResultsPanel() {
         setLayout(new BorderLayout());
@@ -67,7 +84,7 @@ public class ResultsPanel extends JPanel {
 
         progressLabel = Theme.label("Idle");
         progressBar = new JProgressBar(0, 100);
-        progressBar.setBackground(new Color(0x333333));
+        progressBar.setBackground(Theme.TRACK);
         progressBar.setForeground(Theme.ACCENT);
         progressBar.setBorderPainted(false);
         progressBar.setPreferredSize(new Dimension(0, 5));
@@ -90,6 +107,16 @@ public class ResultsPanel extends JPanel {
         filterSimilar = filterToggle("SIMILAR");
         filterDiff    = filterToggle("DIFFERENCE");
         filterAll.setSelected(true);
+        methodFilter   = Theme.<String>comboBox();
+        methodFilter.addItem(ResultTableModel.ANY);
+        p1StatusFilter = Theme.<String>comboBox();
+        p2StatusFilter = Theme.<String>comboBox();
+        for (String s : ResultTableModel.STATUS_CLASSES) {
+            p1StatusFilter.addItem(s);
+            p2StatusFilter.addItem(s);
+        }
+        p1StatusLabel = Theme.dimLabel("P1 Status:");
+        p2StatusLabel = Theme.dimLabel("P2 Status:");
         searchField = Theme.textField(18);
         searchField.setToolTipText("Filter by URL...");
 
@@ -170,10 +197,14 @@ public class ResultsPanel extends JPanel {
         p.add(vsep());
         p.add(summaryItem("Pending", pendingLabel));
 
+        JButton clearBtn = Theme.button("Clear");
+        clearBtn.setToolTipText("Remove all results. New scans append to the table until cleared.");
+        clearBtn.addActionListener(e -> clearResults());
         JButton exportBtn = Theme.primaryButton("Export CSV");
         exportBtn.addActionListener(e -> exportCsv());
         JPanel right = Theme.panel(Theme.PANEL_ALT);
         right.setLayout(new FlowLayout(FlowLayout.RIGHT, 6, 2));
+        right.add(clearBtn);
         right.add(exportBtn);
         // Make the summary row fill width
         JPanel wrap = Theme.panel(Theme.PANEL_ALT);
@@ -184,7 +215,7 @@ public class ResultsPanel extends JPanel {
     }
 
     private JPanel buildPairRow() {
-        JPanel p = Theme.panel(new Color(0x1c1c1c));
+        JPanel p = Theme.panel(Theme.PANEL_ALT);
         p.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 5));
         p.setBorder(new EmptyBorder(2, 6, 2, 6));
 
@@ -192,7 +223,7 @@ public class ResultsPanel extends JPanel {
         p.add(p1Combo);
         JLabel arrow = Theme.label("↔");
         arrow.setForeground(Theme.TEXT_DIM);
-        arrow.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 13));
+        arrow.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 15));
         p.add(arrow);
         p.add(p2Combo);
         p.add(pairNoteLabel);
@@ -208,6 +239,13 @@ public class ResultsPanel extends JPanel {
         p.add(filterSame);
         p.add(filterSimilar);
         p.add(filterDiff);
+        p.add(Box.createHorizontalStrut(10));
+        p.add(Theme.dimLabel("Method:"));
+        p.add(methodFilter);
+        p.add(p1StatusLabel);
+        p.add(p1StatusFilter);
+        p.add(p2StatusLabel);
+        p.add(p2StatusFilter);
 
         JPanel right = Theme.panel(Theme.PANEL);
         right.setLayout(new FlowLayout(FlowLayout.RIGHT, 6, 5));
@@ -222,7 +260,7 @@ public class ResultsPanel extends JPanel {
     }
 
     private JPanel buildDetailPanel() {
-        JPanel dp = Theme.panel(new Color(0x1e1e1e));
+        JPanel dp = Theme.panel(Theme.BG);
         dp.setLayout(new BorderLayout());
         dp.setPreferredSize(new Dimension(0, 180));
         dp.add(detailTabs, BorderLayout.CENTER);
@@ -257,6 +295,12 @@ public class ResultsPanel extends JPanel {
         filterSimilar.addActionListener(e -> { tableModel.setFilter(Verdict.SIMILAR); updateFilterCounts(); });
         filterDiff.addActionListener(e -> { tableModel.setFilter(Verdict.DIFFERENCE); updateFilterCounts(); });
 
+        methodFilter.addActionListener(e -> tableModel.setMethodFilter((String) methodFilter.getSelectedItem()));
+        ActionListener statusListener = e -> tableModel.setStatusFilters(
+                (String) p1StatusFilter.getSelectedItem(), (String) p2StatusFilter.getSelectedItem());
+        p1StatusFilter.addActionListener(statusListener);
+        p2StatusFilter.addActionListener(statusListener);
+
         searchField.addKeyListener(new KeyAdapter() {
             @Override public void keyReleased(KeyEvent e) {
                 tableModel.setSearch(searchField.getText());
@@ -289,6 +333,8 @@ public class ResultsPanel extends JPanel {
         // Update detail tab labels
         detailTabs.setTitleAt(0, p1.getLabel() + " — " + p1.getName());
         detailTabs.setTitleAt(1, p2.getLabel() + " — " + p2.getName());
+        p1StatusLabel.setText(p1.getLabel() + " Status:");
+        p2StatusLabel.setText(p2.getLabel() + " Status:");
 
         updateSummary();
         updateFilterCounts();
@@ -328,13 +374,14 @@ public class ResultsPanel extends JPanel {
         onPairChanged();
     }
 
-    /** Must be called on the EDT before the scan engine starts emitting events. */
+    /** Must be called on the EDT before the scan engine starts emitting events. New results are appended. */
     public void prepareScan(ScanConfig config) {
         this.scanConfig = config;
-        tableModel.clearResults();
         tableModel.setThreshold(config.getSimilarityThreshold());
         doneCount.set(0);
         errorCount.set(0);
+        skippedDuplicates = 0;
+        scanTotal = 0;
         scanStart.set(System.currentTimeMillis());
         progressBar.setValue(0);
         progressLabel.setText("Preparing scan…");
@@ -350,19 +397,87 @@ public class ResultsPanel extends JPanel {
         this.scanEngine = engine;
     }
 
-    /**
-     * Returns a ScanListener that forwards events into this panel's UI.
-     * MainPanel passes this to the real ScanEngine (which has access to MontoyaApi).
-     */
+    public ScanEngine.ScanContext getScanContext() {
+        return scanContext;
+    }
+
+    /** Events must be delivered on the EDT. */
     public ScanEngine.ScanListener getScanListener() {
+        return scanListener;
+    }
+
+    private void clearResults() {
+        if (tableModel.getTotalCount() == 0) return;
+        int choice = JOptionPane.showConfirmDialog(this,
+                "Remove all " + tableModel.getTotalCount() + " results?"
+                        + (scanEngine != null ? "\nAny running scan will be cancelled." : ""),
+                "Clear Results", JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (choice == JOptionPane.OK_OPTION) resetResults();
+    }
+
+    private void resetResults() {
+        if (scanEngine != null) {
+            scanEngine.cancel();
+            scanEngine = null;
+        }
+        tableModel.clearResults();
+        scanContext.rowCounter().set(0);
+        scanContext.scannedFingerprints().clear();
+        pendingMerges.clear();
+        refreshMethodFilter();
+        progressBar.setValue(0);
+        progressLabel.setText("Idle");
+        metaLabel.setText("");
+        updateSummary();
+        updateFilterCounts();
+        updateDetailPanel();
+    }
+
+    private void refreshMethodFilter() {
+        Object selected = methodFilter.getSelectedItem();
+        java.util.SortedSet<String> methods = tableModel.getMethods();
+        if (methodFilter.getItemCount() == methods.size() + 1) return;
+        methodFilter.removeAllItems();
+        methodFilter.addItem(ResultTableModel.ANY);
+        for (String m : methods) methodFilter.addItem(m);
+        methodFilter.setSelectedItem(selected != null && methods.contains(selected) ? selected : ResultTableModel.ANY);
+    }
+
+    private ScanEngine.ScanListener createScanListener() {
         return new ScanEngine.ScanListener() {
             @Override public void onResult(ScanResult result) {
+                List<RequestGroup> merges = pendingMerges.remove(result.getGroup().getFingerprint());
+                if (merges != null) merges.forEach(g -> mergeInto(result, g));
                 tableModel.addResult(result);
+                refreshMethodFilter();
                 updateSummary();
                 updateFilterCounts();
             }
+            @Override public void onDuplicate(RequestGroup group) {
+                skippedDuplicates++;
+                ScanResult existing = tableModel.findByFingerprint(group.getFingerprint());
+                if (existing != null) {
+                    mergeInto(existing, group);
+                    tableModel.refresh();
+                } else {
+                    pendingMerges.computeIfAbsent(group.getFingerprint(), k -> new java.util.ArrayList<>()).add(group);
+                }
+            }
+            @Override public void onPlanned(int received, int excluded, int toScan) {
+                scanTotal = toScan;
+                progressLabel.setText("Queued " + toScan + " unique endpoint(s) from " + received
+                        + " request(s) — excluded " + excluded + " (OPTIONS / static / rules), "
+                        + skippedDuplicates + " already in results");
+                if (toScan == 0) {
+                    progressBar.setValue(100);
+                    metaLabel.setText("Nothing new to scan.");
+                }
+            }
             @Override public void onProgress(int done, int total) {
+                // Workers report from several threads, so updates can arrive out of order.
+                if (done < doneCount.get()) return;
                 doneCount.set(done);
+                scanTotal = total;
                 int pct = total > 0 ? (done * 100 / total) : 0;
                 progressBar.setValue(pct);
                 String profiles = scanConfig != null
@@ -381,7 +496,10 @@ public class ResultsPanel extends JPanel {
             }
             @Override public void onComplete() {
                 progressBar.setValue(100);
-                progressLabel.setText("Scan complete — " + doneCount.get() + " requests processed.");
+                metaLabel.setText("Done: " + scanTotal + "  |  Errors: " + errorCount.get() + "  |  100%");
+                progressLabel.setText("Scan complete — " + scanTotal + " endpoint(s) replayed"
+                        + (skippedDuplicates > 0 ? ", " + skippedDuplicates + " already in results (merged into existing rows)" : "")
+                        + ".");
                 updateSummary();
                 updateFilterCounts();
             }
@@ -393,6 +511,11 @@ public class ResultsPanel extends JPanel {
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private static void mergeInto(ScanResult target, RequestGroup duplicate) {
+        target.getGroup().addGrouped(duplicate.getRepresentative());
+        duplicate.getGrouped().forEach(target.getGroup()::addGrouped);
+    }
 
     private void updateSummary() {
         int total   = tableModel.getTotalCount();
@@ -444,13 +567,13 @@ public class ResultsPanel extends JPanel {
     }
 
     private static String requestText(ScanResult result, UserProfile profile) {
-        return result.getRequest(profile.getId()).toString();
+        return HttpText.message(result.getRequest(profile.getId()));
     }
 
     private static String responseText(ScanResult result, UserProfile profile) {
         burp.api.montoya.http.message.responses.HttpResponse resp =
                 result.getResponses().get(profile.getId());
-        return resp == null ? "(no response)" : resp.toString();
+        return resp == null ? "(no response)" : HttpText.message(resp);
     }
 
     private String buildDiff(ScanResult result, UserProfile p1, UserProfile p2) {
@@ -458,8 +581,8 @@ public class ResultsPanel extends JPanel {
         burp.api.montoya.http.message.responses.HttpResponse r2 = result.getResponses().get(p2.getId());
         if (r1 == null || r2 == null) return "(responses not available)";
 
-        String[] linesA = r1.bodyToString().split("\n", -1);
-        String[] linesB = r2.bodyToString().split("\n", -1);
+        String[] linesA = HttpText.body(r1).split("\n", -1);
+        String[] linesB = HttpText.body(r2).split("\n", -1);
 
         Float sim = result.getSimilarity(p1.getId(), p2.getId());
         String header = "--- " + p1.getLabel() + " — " + p1.getName() + "\n"
@@ -507,6 +630,7 @@ public class ResultsPanel extends JPanel {
 
         CsvExporter.exportToFile(this,
                 tableModel,
+                profiles,
                 profiles.get(i1).getId(),
                 profiles.get(i2).getId(),
                 scanConfig.getSimilarityThreshold());
@@ -522,7 +646,7 @@ public class ResultsPanel extends JPanel {
     private static JLabel boldCountLabel(String text, Color color) {
         JLabel l = new JLabel(text);
         l.setForeground(color);
-        l.setFont(new Font(Font.MONOSPACED, Font.BOLD, 13));
+        l.setFont(new Font(Font.MONOSPACED, Font.BOLD, 15));
         return l;
     }
 
@@ -562,7 +686,7 @@ public class ResultsPanel extends JPanel {
         // Selected style via ItemListener
         btn.addItemListener(e -> {
             boolean selected = e.getStateChange() == java.awt.event.ItemEvent.SELECTED;
-            btn.setBackground(selected ? Theme.PANEL_ALT : Theme.PANEL);
+            btn.setBackground(selected ? Theme.ROW_SEL : Theme.PANEL);
             btn.setForeground(selected ? Theme.TEXT_BRIGHT : Theme.TEXT_DIM);
         });
         return btn;
@@ -610,7 +734,7 @@ public class ResultsPanel extends JPanel {
 
     private static JTextPane detailPane() {
         JTextPane tp = new JTextPane();
-        tp.setBackground(new Color(0x1a1a1a));
+        tp.setBackground(Theme.INPUT_BG);
         tp.setForeground(Theme.TEXT);
         tp.setFont(Theme.MONO);
         tp.setEditable(false);
