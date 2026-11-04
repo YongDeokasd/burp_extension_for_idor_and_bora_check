@@ -1,6 +1,8 @@
 package com.idorbola.checker.core;
 
 import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.http.RequestOptions;
+import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.responses.HttpResponse;
 import com.idorbola.checker.model.*;
@@ -40,6 +42,7 @@ public class ScanEngine {
 
     private final AtomicBoolean cancelled  = new AtomicBoolean(false);
     private final AtomicBoolean paused     = new AtomicBoolean(false);
+    private RequestOptions requestOptions;
     private final Set<String> delivered    = ConcurrentHashMap.newKeySet();
     private ExecutorService executor;
 
@@ -54,6 +57,7 @@ public class ScanEngine {
         cancelled.set(false);
         paused.set(false);
         executor = Executors.newFixedThreadPool(Math.max(1, config.getThreadPoolSize()));
+        requestOptions = timeoutOptions();
 
         // Coordinator must not run inside the worker pool: it blocks on the workers' futures.
         Thread coordinator = new Thread(() -> runScan(requests), "idor-bola-scan-coordinator");
@@ -159,7 +163,10 @@ public class ScanEngine {
             HttpRequest modified = replacer.apply(group.getRepresentative(), profile);
             result.putRequest(profile.getId(), modified);
             try {
-                HttpResponse response = api.http().sendRequest(modified).response();
+                HttpRequestResponse sent = requestOptions != null
+                        ? api.http().sendRequest(modified, requestOptions)
+                        : api.http().sendRequest(modified);
+                HttpResponse response = sent.response();
                 result.putResponse(profile.getId(), response);
             } catch (Exception e) {
                 // Store null response — status will be -1
@@ -192,6 +199,17 @@ public class ScanEngine {
 
         delivered.add(group.getFingerprint());
         listener.onResult(result);
+    }
+
+    /** Per-response timeout from the settings; null on Burp versions without RequestOptions timeouts. */
+    private RequestOptions timeoutOptions() {
+        try {
+            return RequestOptions.requestOptions().withResponseTimeout(config.getTimeoutSeconds() * 1000L);
+        } catch (LinkageError e) {
+            api.logging().logToOutput("This Burp version does not support per-request timeouts; "
+                    + "using Burp's default network timeout.");
+            return null;
+        }
     }
 
     public void pause()  { paused.set(true); }

@@ -1,5 +1,7 @@
 package com.idorbola.checker.ui;
 
+import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.http.message.requests.HttpRequest;
 import com.idorbola.checker.core.ScanEngine;
 import com.idorbola.checker.model.*;
 import com.idorbola.checker.util.CsvExporter;
@@ -60,6 +62,8 @@ public class ResultsPanel extends JPanel {
     private final MessageView p2Detail;
     private final JTextPane diffDetail;
 
+    private final MontoyaApi api;
+
     // State
     private ScanConfig scanConfig;
     private ScanEngine scanEngine;
@@ -78,7 +82,8 @@ public class ResultsPanel extends JPanel {
     private final Map<String, List<RequestGroup>> pendingMerges = new HashMap<>();
     private final ScanEngine.ScanListener scanListener = createScanListener();
 
-    public ResultsPanel() {
+    public ResultsPanel(MontoyaApi api) {
+        this.api = api;
         setLayout(new BorderLayout());
         setBackground(Theme.BG);
 
@@ -137,6 +142,7 @@ public class ResultsPanel extends JPanel {
 
         buildUI();
         wireEvents();
+        installSendShortcuts();
     }
 
     private void buildUI() {
@@ -692,6 +698,67 @@ public class ResultsPanel extends JPanel {
         return btn;
     }
 
+    // ── Send to Repeater / Intruder ─────────────────────────────────────────
+
+    private void installSendShortcuts() {
+        KeyStroke repeater = KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK);
+        KeyStroke intruder = KeyStroke.getKeyStroke(KeyEvent.VK_I, InputEvent.CTRL_DOWN_MASK);
+        Action toRepeater = new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { sendSelected(true); }
+        };
+        Action toIntruder = new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { sendSelected(false); }
+        };
+
+        // Ancestor binding covers the whole tab; focused-component bindings win over text/table defaults.
+        JComponent[] focusTargets = {resultsTable, p1Detail.text, p2Detail.text, diffDetail};
+        bind(this, JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT, repeater, intruder, toRepeater, toIntruder);
+        for (JComponent c : focusTargets) {
+            bind(c, JComponent.WHEN_FOCUSED, repeater, intruder, toRepeater, toIntruder);
+        }
+    }
+
+    private static void bind(JComponent c, int condition, KeyStroke repeater, KeyStroke intruder,
+                             Action toRepeater, Action toIntruder) {
+        c.getInputMap(condition).put(repeater, "idorBola.sendToRepeater");
+        c.getInputMap(condition).put(intruder, "idorBola.sendToIntruder");
+        c.getActionMap().put("idorBola.sendToRepeater", toRepeater);
+        c.getActionMap().put("idorBola.sendToIntruder", toIntruder);
+    }
+
+    /** Sends the request of the profile shown in the detail tabs, for every selected row. */
+    private void sendSelected(boolean toRepeater) {
+        String target = toRepeater ? "Repeater" : "Intruder";
+        UserProfile profile = viewedProfile();
+        int[] rows = resultsTable.getSelectedRows();
+        if (profile == null || rows.length == 0) {
+            metaLabel.setText("Select a result row to send to " + target + ".");
+            return;
+        }
+        int sent = 0;
+        for (int row : rows) {
+            ScanResult result = tableModel.getResultAt(row);
+            if (result == null) continue;
+            HttpRequest request = result.getRequest(profile.getId());
+            if (toRepeater) {
+                api.repeater().sendToRepeater(request, profile.getLabel() + " #" + (result.getRowIndex() + 1));
+            } else {
+                api.intruder().sendToIntruder(request);
+            }
+            sent++;
+        }
+        metaLabel.setText("Sent " + sent + " request(s) as " + profile.getLabel() + " — " + profile.getName()
+                + " to " + target + ".");
+    }
+
+    /** The profile whose tab is open below the table; the Diff tab counts as the first profile. */
+    private UserProfile viewedProfile() {
+        int i1 = p1Combo.getSelectedIndex();
+        int i2 = p2Combo.getSelectedIndex();
+        if (detailTabs.getSelectedIndex() == 1 && i2 >= 0 && i2 < profiles.size()) return profiles.get(i2);
+        return i1 >= 0 && i1 < profiles.size() ? profiles.get(i1) : null;
+    }
+
     /** One profile's sent request and received response, with a Request/Response switch. */
     private static final class MessageView extends JPanel {
         private final JToggleButton requestBtn  = filterToggle("Request");
@@ -715,6 +782,8 @@ public class ResultsPanel extends JPanel {
             bar.setLayout(new FlowLayout(FlowLayout.LEFT, 6, 4));
             bar.add(requestBtn);
             bar.add(responseBtn);
+            bar.add(Box.createHorizontalStrut(12));
+            bar.add(Theme.dimLabel("Ctrl+R: Send to Repeater   Ctrl+I: Send to Intruder  (this profile's request)"));
 
             add(bar, BorderLayout.NORTH);
             add(Theme.scrollPane(text), BorderLayout.CENTER);
